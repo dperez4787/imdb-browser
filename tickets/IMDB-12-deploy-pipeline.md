@@ -1,0 +1,52 @@
+---
+id: IMDB-12
+title: Deploy pipeline — Firebase Hosting + Cloud Run via OIDC/WIF
+status: needs-architecture
+owner: product-owner
+depends-on: [IMDB-1, IMDB-10]
+branch: ""
+pr: ""
+---
+
+## Description
+
+Continuous deployment mirroring linear-example's `deploy.yml` and `firebase.json`, per
+the brief: on push to `main`, GitHub Actions deploys the SPA to Firebase Hosting and
+the chat backend to Cloud Run. Auth is OIDC / Workload Identity Federation
+(`id-token: write`) — no service-account keys anywhere. The backend image is built on
+the runner from IMDB-10's Dockerfile, pushed to Artifact Registry, **tagged by commit
+SHA, never `latest`**; `ANTHROPIC_API_KEY` reaches Cloud Run from Secret Manager.
+`firebase-tools` is pinned to an exact version and `firebase deploy` runs from the repo
+root where `firebase.json` lives. Blocked on the OPEN "GCP provisioning for this repo"
+section of `docs/architecture.md` (project/region, Artifact Registry repo, WIF provider
++ deploy SA, Firebase site, Secret Manager entries). **GCP provisioning and all IAM
+changes are executed by the user, not agents** — this ticket includes producing the
+exact provisioning steps/values for the user to run, then wiring the workflow to them.
+
+## Acceptance criteria
+
+- The architecture doc's provisioning section is settled and the user has run the
+  listed IAM/provisioning steps (logged on this ticket).
+- A push to `main` triggers one workflow run that (a) builds and deploys the SPA to
+  the Firebase Hosting site, and (b) builds the chat image, pushes it to Artifact
+  Registry tagged with the commit SHA, and deploys that tag to Cloud Run — both
+  verifiable from the run logs and the live URLs.
+- The deployed SPA serves over the Hosting URL and the deployed chat service responds
+  on Cloud Run with `ANTHROPIC_API_KEY` sourced from Secret Manager (never from the
+  repo or workflow file).
+- The workflow authenticates via OIDC/WIF with `id-token: write`; the repo and its
+  GitHub secrets contain no service-account key JSON.
+- No image is tagged or deployed as `latest`; `firebase-tools` is version-pinned;
+  `firebase.json` lives at the repo root.
+
+## Files expected to change
+
+- .github/workflows/deploy.yml
+- firebase.json, .firebaserc
+- docs/architecture.md (provisioning values, recorded by the architect)
+
+## Log
+
+- **product-owner** — filed. `needs-architecture`: blocked on the OPEN "GCP
+  provisioning for this repo" section; the actual provisioning/IAM commands are
+  user-run by policy. Needs IMDB-1 (something to host) and IMDB-10 (an image to ship).
