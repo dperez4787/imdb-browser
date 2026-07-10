@@ -1,9 +1,9 @@
 ---
 id: IMDB-5
 title: Universal search box with autocomplete and poster-rich results
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-2-universal-search.md
 depends-on: [IMDB-4]
 branch: ""
 pr: ""
@@ -59,3 +59,13 @@ where selecting a result navigates — coordinate with the architect.
   blocked on IMDB-4 (and thus the router-auth and client-layer architecture
   decisions). Stopgap explicitly sanctioned by the brief; replaceable when the
   `search(query, limit)` union field ships upstream.
+- **ui-ux-designer** — design spec written: `designs/DES-2-universal-search.md`.
+  Answers placement (hero on `/`, compact in TopBar — one component), panel anatomy,
+  card anatomy, keyboard model (ARIA combobox), all states, and documents the exact
+  client-side merge heuristic (2 titles : 1 person positional interleave over
+  server-popularity-sorted lists, exact-name promotion) so no decision is left to the
+  developer. IMDB-13's freshness indicator is folded in as the panel footer
+  (`SearchFreshness`, reusable). Detail-route literals follow the architect's routing
+  decision in `docs/architecture.md` (spec assumes `/title/:tconst`, `/name/:nconst`);
+  that ordering is carried by depends-on (IMDB-4 chain), not by an open design
+  question → `ready-for-dev`.
