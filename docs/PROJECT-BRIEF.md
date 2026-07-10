@@ -17,6 +17,12 @@ The SPA talks GraphQL to the cosmo router. It never queries Mongo, never calls a
 subgraph directly. The one non-router dependency is the OMDb image API (below), plus
 this repo's own chat backend.
 
+**Deploy coupling (per the user):** pushing a subgraph update in imdb-federation
+triggers a cosmo-router recompose + redeploy. Consequence for this repo: the router's
+served schema can change without any commit here — verify schema shapes against the
+live router when a federation change lands, and expect a brief router redeploy window
+after subgraph pushes.
+
 ## Search capabilities (8th subgraph — "orchestrator", in progress)
 
 An orchestrator subgraph is being added to imdb-federation that materializes search
