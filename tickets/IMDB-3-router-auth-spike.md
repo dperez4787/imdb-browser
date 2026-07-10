@@ -1,10 +1,10 @@
 ---
 id: IMDB-3
 title: Architecture spike — how the browser authenticates to the cosmo router
-status: needs-architecture
+status: in-review
 owner: product-owner
 depends-on: []
-branch: ""
+branch: "architecture-round-1"
 pr: ""
 ---
 
@@ -43,3 +43,18 @@ view that fetches data.
 - **product-owner** — filed. `needs-architecture` by definition — this ticket *is* the
   resolution of the OPEN section. No code in this repo changes; the deliverable is the
   recorded, evidenced decision.
+- **architect** — resolved. Decision recorded in `docs/architecture.md` § "Router
+  authentication from the browser": the SPA sends the user's Firebase ID token as
+  `Authorization: Bearer` directly to `POST https://cosmo-router-dkuqnmldta-uc.a.run.app/graphql`;
+  the router (deployed `--allow-unauthenticated`, per its `deploy.yml`) validates it
+  via stock JWKS config (`cosmo-router/config/config.yaml`, Firebase securetoken JWKS,
+  audience `project-d60a83c1-2c60-4d51-ad0`). Binding consequence: this repo's SPA
+  must use Firebase project `project-d60a83c1-2c60-4d51-ad0`. No cosmo-router change,
+  no proxy. Evidence logged in the doc: anonymous POST → 401 live; authenticated POST
+  (Google OIDC identity token, the config's second JWKS provider) → 200 with data
+  live; CORS preflight live allows `Authorization` from any origin. AC 1, 2, 4 met;
+  AC 3 met for the Google-OIDC JWT path — the Firebase-ID-token variant is verified
+  from router config (JWKS URL + audience) but needs a signed-in browser user to
+  exercise live, which is exactly IMDB-4's first acceptance criterion. Status
+  `in-review` on PR branch `architecture-round-1`; tester/user can close once IMDB-4
+  demos the Firebase-token request end-to-end.
