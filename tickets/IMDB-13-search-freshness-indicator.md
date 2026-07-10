@@ -1,9 +1,9 @@
 ---
 id: IMDB-13
 title: Surface searchInfo.rebuiltAt freshness on search surfaces
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-2-universal-search.md
 depends-on: [IMDB-5]
 branch: ""
 pr: ""
@@ -43,3 +43,10 @@ happens when the value is unavailable.
 
 - **product-owner** — filed. `needs-design` (placement/wording). Small, honest-UX
   ticket straight from the brief; depends on IMDB-5's search surface existing.
+- **ui-ux-designer** — folded into `designs/DES-2-universal-search.md` (one spec, one
+  component) rather than a separate spec: `SearchFreshness` is the autocomplete
+  panel's footer line — "Index rebuilt 3 h ago" relative under 24h, date beyond, ⓘ
+  with absolute timestamp, and **renders nothing at all** when `searchInfo` is
+  unavailable (absence, never a guess). Exported standalone and mounted verbatim in
+  DES-3's toolbar, satisfying the reuse criterion. Fetch rule specified (rides the
+  first aliased search request, cached 5 min). Nothing unsettled → `ready-for-dev`.

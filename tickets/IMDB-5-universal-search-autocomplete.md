@@ -1,9 +1,9 @@
 ---
 id: IMDB-5
 title: Universal search box with autocomplete and poster-rich results
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-2-universal-search.md
 depends-on: [IMDB-4]
 branch: ""
 pr: ""
@@ -59,3 +59,23 @@ where selecting a result navigates — coordinate with the architect.
   blocked on IMDB-4 (and thus the router-auth and client-layer architecture
   decisions). Stopgap explicitly sanctioned by the brief; replaceable when the
   `search(query, limit)` union field ships upstream.
+- **ui-ux-designer** — design spec written: `designs/DES-2-universal-search.md`.
+  Answers placement (hero on `/`, compact in TopBar — one component), panel anatomy,
+  card anatomy, keyboard model (ARIA combobox), all states, and documents the exact
+  client-side merge heuristic (2 titles : 1 person positional interleave over
+  server-popularity-sorted lists, exact-name promotion) so no decision is left to the
+  developer. IMDB-13's freshness indicator is folded in as the panel footer
+  (`SearchFreshness`, reusable). Detail-route literals follow the architect's routing
+  decision in `docs/architecture.md` (spec assumes `/title/:tconst`, `/name/:nconst`);
+  that ordering is carried by depends-on (IMDB-4 chain), not by an open design
+  question → `ready-for-dev`.
+- **ui-ux-designer** — upstream simplification: the unified `search(query, kinds,
+  limit)` union has landed (`imdb-federation/API-CHANGES.md`, authoritative; see
+  `docs/architecture.md`). DES-2 revised in place: server-ranked union hits are now
+  the primary rows; the aliased prefix pair stays in the **same single document** as
+  the fill for partial-word typing (the client 2:1 merge is demoted to DES-2
+  Appendix A; exact-name promotion retired — server relevance owns it). Still
+  exactly one router request per settled keystroke burst — read this ticket's
+  "aliased two-query document" AC parenthetical as "the single aliased search
+  document" per the revised spec. Also added: the index-never-built empty state
+  (`searchInfo.rebuiltAt` null until the user runs the federation rebuild).

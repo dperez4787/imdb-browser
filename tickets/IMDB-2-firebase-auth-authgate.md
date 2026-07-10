@@ -1,9 +1,9 @@
 ---
 id: IMDB-2
 title: Firebase Auth with Google-only sign-in behind an AuthGate
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-1]
 branch: ""
 pr: ""
@@ -46,3 +46,9 @@ signed-in user indicator + sign-out affordance in the app shell.
 - **product-owner** — filed. `needs-design` for the sign-in screen, auth-resolving
   state, and signed-in indicator; the auth mechanics themselves are settled by the
   brief (mirror linear-example, Google-only).
+- **ui-ux-designer** — design spec written: `designs/DES-1-marquee-shell-and-sign-in.md`
+  (sign-in card with Google button + inline error, AuthCurtain no-flash resolving
+  state, TopBar chrome with UserMenu avatar/sign-out). It also carries the product
+  concept and shared visual language all other specs reference. All three designer
+  questions from the description are answered; module names match the ticket
+  (`auth.js`, `AuthGate`). Nothing unsettled → `ready-for-dev`.

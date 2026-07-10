@@ -1,9 +1,9 @@
 ---
 id: IMDB-11
 title: Chat assistant UI in the SPA
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-2, IMDB-10]
 branch: ""
 pr: ""
@@ -46,3 +46,13 @@ behavior.
 - **product-owner** — filed. `needs-design`; also depends on IMDB-10's API contract
   (itself `needs-architecture`), so the design spec should be written against the
   decided contract.
+- **ui-ux-designer** — design spec written: `designs/DES-7-chat-concierge.md`.
+  "Ever-present" decided as a right-docked 380px panel the content reflows around
+  (overlay/sheet at smaller widths), toggled by TopBar button + Cmd/Ctrl+/ and
+  persistent across navigation; conversation layout, empty/first-run prompts, error
+  vs auth-rejection states with the retry-replaces rule, and keyboard/focus behavior
+  all specified. The IMDB-10 contract is still in flight, so the spec defines the
+  rendering for BOTH transport outcomes (streaming: progressive text + caret;
+  non-streaming: typing indicator) — the developer follows whichever the contract
+  states, deciding nothing. Design leaves no open decision → `ready-for-dev`
+  (contract ordering rides depends-on IMDB-10).

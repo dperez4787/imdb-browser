@@ -1,9 +1,9 @@
 ---
 id: IMDB-9
 title: Person visual treatment — known-for poster mosaic vs placeholder
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-6-person-visual-treatment.md
 depends-on: [IMDB-5, IMDB-8]
 branch: ""
 pr: ""
@@ -51,3 +51,23 @@ IMDB-5 and IMDB-8.
 - **product-owner** — filed. `needs-design`, and explicitly a designer **and**
   architect conversation per the brief's "Open idea" bullet (Images — OMDb section).
   Deliberately split from IMDB-8 so person pages ship on the placeholder first.
+- **ui-ux-designer** — design proposal written: `designs/DES-6-person-visual-treatment.md`
+  (status `draft`). Proposes a tiered treatment: 2×2 known-for poster mosaic on the
+  person page header (budget ≤4 OMDb requests/page), single poster + monogram badge on
+  person cards (≤1, lazy), monogram always in autocomplete (0), with a fully designed
+  degradation ladder down to the Monogram floor. Both ideal and degraded states are
+  drawn; "keep the monogram everywhere" is an explicitly acceptable verdict. Staying
+  `needs-design`: the spec's three feasibility gates (known-for title-id field
+  exposure, OMDb request budget, no-new-query assumption) are being verified by the
+  architect in parallel — the main session reconciles this ticket once those facts
+  land in `docs/architecture.md`.
+- **ui-ux-designer** — feasibility confirmed: `docs/architecture.md` → "Person
+  visuals — data facts & OMDb budget" verifies live that `Name.knownForTitles`
+  returns ≤4 hydrated titles (tconst, primaryTitle, startYear, rating.numVotes) in
+  the same query at zero extra GraphQL cost, and adopts the proposed budgets (≤4
+  posters per person page, ≤1 per person card lazy, 0 in autocomplete, instant
+  fallback on 404). DES-6's tiered treatment is now **the decision**: 2×2 known-for
+  mosaic on the person page header, single most-voted-known-for poster + monogram
+  badge on person cards, monogram floor everywhere; the monogram-everywhere
+  contingency is retired. Spec `approved` → `ready-for-dev` (depends-on
+  IMDB-5/IMDB-8 unchanged — this upgrades what they ship).

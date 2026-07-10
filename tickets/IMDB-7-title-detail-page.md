@@ -1,9 +1,9 @@
 ---
 id: IMDB-7
 title: Title detail page
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-4-title-detail.md
 depends-on: [IMDB-4, IMDB-5]
 branch: ""
 pr: ""
@@ -49,3 +49,10 @@ before and after person pages exist.
 - **product-owner** — filed. `needs-design`. Also inherits the routing-scheme OPEN
   question via its URL requirement and depends on IMDB-4/IMDB-5. Cross-navigation to
   person pages completes in IMDB-8.
+- **ui-ux-designer** — design spec written: `designs/DES-4-title-detail.md` (one-sheet
+  layout: poster + fact line + RatingBlock + GenreChips, credits grouped per data
+  category — never hard-coded — with the pre-IMDB-8 non-interactive person-chip
+  treatment specified so nothing 404s; not-found/error/loading/poster-missing states
+  all drawn). Route literal follows the architect's routing decision (spec assumes
+  `/title/:tconst`); credits-shape field names are introspection-verified per the
+  ticket. No open design decision remains → `ready-for-dev`.
