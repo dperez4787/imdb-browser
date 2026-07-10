@@ -1,7 +1,7 @@
 ---
 id: IMDB-10
 title: Chat backend scaffold — Anthropic agentic loop with GraphQL MCP on Cloud Run
-status: needs-architecture
+status: ready-for-dev
 owner: product-owner
 depends-on: []
 branch: ""
@@ -51,3 +51,22 @@ dedicated modules per CLAUDE.md.
 - **product-owner** — filed. `needs-architecture`: blocked on the OPEN "Chat backend
   API contract" section (endpoint shape, session model, MCP package, router auth from
   the service, guardrails). Independent of all frontend tickets.
+- **architect** — unblocked → `ready-for-dev`. Contract in `docs/architecture.md`
+  § "Chat backend API contract". What the developer needs: `POST /api/chat` streaming
+  SSE (`text`/`tool`/`done`/`error` events) + unauthenticated `GET /health`;
+  stateless — client sends full history, cap 20 messages / 16 KB; verify the Firebase
+  ID token with `firebase-admin.verifyIdToken()` (project
+  `project-d60a83c1-2c60-4d51-ad0`) **before** any Anthropic call (401 with zero
+  Anthropic spend — test this path); MCP server is **`mcp-graphql`** (verified on
+  npm, v2.0.4, github.com/blurrah/mcp-graphql), spawned stdio per request with
+  endpoint = `https://cosmo-router-dkuqnmldta-uc.a.run.app/graphql` and header
+  `Authorization: Bearer <the requesting user's forwarded Firebase ID token>` — the
+  backend authenticates to the router *as the user*, no service credential; Anthropic
+  via `@anthropic-ai/sdk`, model `claude-opus-4-8`, streaming, tools =
+  introspect-schema + query-graphql. Guardrails (all observable per AC):
+  `max_tokens: 2048`, max 8 tool iterations, 10 req/min per uid in-memory rate limit
+  → 429, history cap → 400/413. `ANTHROPIC_API_KEY` env-only. For the live-data AC
+  ("highest-rated Christopher Nolan titles"): entity queries work today, but the
+  orchestrator's search collections have never been rebuilt (`searchInfo.rebuiltAt`
+  is null, verified live) — the user must run imdb-federation `./scripts/rebuild.sh`
+  before search-dependent questions return data.
