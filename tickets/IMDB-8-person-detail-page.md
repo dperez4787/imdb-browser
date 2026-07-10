@@ -1,9 +1,9 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-5-person-detail.md
 depends-on: [IMDB-5, IMDB-7]
 branch: ""
 pr: ""
@@ -48,3 +48,12 @@ filmography organization — by category? known-for first?), how title entries d
 - **product-owner** — filed. `needs-design`. Ships with the placeholder person visual;
   the mosaic/known-for-poster idea is deliberately split into IMDB-9 so this page
   isn't blocked on that designer+architect discussion.
+- **ui-ux-designer** — design spec written: `designs/DES-5-person-detail.md` (billing
+  layout: PersonVisual slot rendering the Monogram in this ticket — DES-6 upgrades
+  internals later without layout change — plus Known-for strip and category-grouped
+  filmography; all states drawn). Two data assumptions are stated explicitly in the
+  spec's Data needs (A: a known-for field with Title stubs — with a designed fallback
+  if absent; B: a Name→credits edge with category/characters — load-bearing) for the
+  architect to confirm; field names introspection-verified per the ticket. The design
+  itself leaves no decision open → `ready-for-dev` (data-layer ordering rides
+  depends-on IMDB-5/IMDB-7).
