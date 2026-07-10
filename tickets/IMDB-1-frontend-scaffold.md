@@ -1,10 +1,10 @@
 ---
 id: IMDB-1
 title: Frontend scaffold — Vite React SPA with test setup
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 depends-on: []
-branch: ""
+branch: "imdb-1-frontend-scaffold"
 pr: ""
 ---
 
@@ -45,3 +45,4 @@ shell that renders a placeholder screen.
 - **product-owner** — filed. Pure toolchain scaffold, no UI design or open architecture
   decision touched, so `ready-for-dev`. Router choice deliberately excluded (OPEN in
   docs/architecture.md).
+- **developer** — claimed. Branch `imdb-1-frontend-scaffold` off `main`.
