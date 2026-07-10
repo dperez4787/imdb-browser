@@ -1,9 +1,9 @@
 ---
 id: IMDB-6
 title: Faceted title search view
-status: needs-design
+status: needs-architecture
 owner: product-owner
-design: ""   # to be filled by ui-ux-designer
+design: designs/DES-3-faceted-title-search.md
 depends-on: [IMDB-4]
 branch: ""
 pr: ""
@@ -55,3 +55,10 @@ image-missing / error states.
 - **product-owner** — filed. `needs-design`; also blocked on the OPEN "Frontend
   routing & state" section (shareable filter URLs) and transitively on IMDB-4 —
   whoever unblocks last flips it to `ready-for-dev`.
+- **ui-ux-designer** — design spec written: `designs/DES-3-faceted-title-search.md`
+  (filter rail + grid layout, API-driven FacetGroups with counts, ALL/ANY people
+  filter expression, active-filter chips, Prev/Next paging with `Page N of M`, all
+  states; `SearchFreshness` reused from DES-2). Design side is settled; the spec
+  enumerates the state dimensions that must round-trip through the URL, but the URL
+  encoding itself is the OPEN "Frontend routing & state" decision — moving to
+  `needs-architecture` until the architect lands it (spec stays `draft` till then).
