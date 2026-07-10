@@ -1,7 +1,7 @@
 ---
 id: IMDB-1
 title: Frontend scaffold — Vite React SPA with test setup
-status: in-review
+status: done
 owner: product-owner
 depends-on: []
 branch: "imdb-1-frontend-scaffold"
@@ -58,3 +58,29 @@ shell that renders a placeholder screen.
   and the transformed App module with the placeholder markup. No `fetch()`/GraphQL/
   Firebase anywhere (grep-checked). Skipped/not done on purpose: no router, no CSS
   framework, no real-browser console check (curl + Testing Library only).
+- **tester** — verdict: **all criteria pass**; `status: done`, PR taken out of draft.
+  Verified on Node v24.18.0 / npm 11.16.0, clean checkout (`rm -rf node_modules`).
+  Added tester tests (`src/main.test.jsx`, `src/scaffold-conventions.test.js`),
+  committed to the PR branch.
+  - `npm run dev` serves visible placeholder, no blank screen — **pass**. Ran
+    `npm run dev -- --port 5199 --strictPort`; curl: `/` 200 with `#root` +
+    `/src/main.jsx` script, transformed `/src/App.jsx` carries the placeholder
+    markup, `/src/main.jsx` 200. `main.test.jsx` drives the real entry module and
+    asserts the h1 + tagline mount into `#root` with `console.error` never called.
+    Caveat (same as developer's): no real browser available — served-HTML via curl
+    plus jsdom-rendered output is the evidence; the "no console errors in a live
+    browser" clause is verified only to that extent.
+  - `npm run build` clean — **pass**. Exit 0, `dist/` emitted, placeholder markup
+    present in `dist/assets/index-*.js` (grep-confirmed).
+  - `npm test` passes incl. colocated `*.test.jsx` Testing Library test — **pass**.
+    `npm ci && npm test` from clean checkout: exit 0, 3 files / 6 tests (developer's
+    `App.test.jsx` + tester's two). All deps declared; no undeclared flags.
+  - `.nvmrc` Node LTS + ES modules — **pass**. Repo-root `.nvmrc` = `24` (even/LTS
+    line), `"type": "module"` in `app/frontend/package.json`; asserted by
+    `scaffold-conventions.test.js`.
+  - `src/graphql/` boundary exists — **pass**. Comment-only stub `index.js`;
+    asserted by test.
+  - No `fetch()`/GraphQL/Firebase, no network requests — **pass**. Grep over `src/`
+    (only hit is the prohibition comment in the graphql stub) plus comment-stripping
+    test assertion; diff-wide secret scan (api keys/passwords/tokens/conn strings)
+    found nothing.
