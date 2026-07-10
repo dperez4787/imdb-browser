@@ -14,9 +14,12 @@ larger hero on the home route, but it is the *same* component with the same beha
 The index-freshness caveat (`searchInfo.rebuiltAt`, IMDB-13) is folded in here as the
 autocomplete panel's footer — the honest small print at the exact moment the user is
 trusting the index — via a component (`SearchFreshness`) that DES-3's faceted view
-reuses verbatim. This spec implements the brief's zero-backend stopgap (aliased
-`searchTitles` + `searchNames` in one request, merged client-side) and documents the
-merge heuristic so the developer decides nothing.
+reuses verbatim. The unified `search(query, kinds, limit)` union has landed upstream
+(`imdb-federation/API-CHANGES.md`, authoritative; see `docs/architecture.md`), so
+**server-side ranking is the primary data path**: union hits render in server order
+and the client invents no ordering. The brief's zero-backend stopgap — the aliased
+prefix pair merged client-side — is demoted to the fill rule for partial-word typing
+(Appendix A), riding in the same single request.
 
 ## Layout
 
@@ -93,6 +96,16 @@ No results:
         ├────────────────────────────────────────┤
         │              Index rebuilt 3 h ago  ⓘ  │
 
+No results, index never built (searchInfo.rebuiltAt is null —
+a real, live-verified state of this system: every query returns
+nothing until the first federation rebuild runs):
+        ├────────────────────────────────────────┤
+        │   The search index hasn’t been built   │
+        │   yet — nothing is searchable until    │
+        │   the first rebuild runs.              │
+        ├────────────────────────────────────────┤
+        │              Index not yet built  ⓘ    │
+
 Error:
         ├────────────────────────────────────────┤
         │   ⚠ Search isn’t responding.           │
@@ -109,7 +122,10 @@ Poster missing/404:  that row's thumb renders FallbackArt
   `just now` under 60s); `Index rebuilt <Mon D>` when older. Hovering/focusing the
   `ⓘ` shows the absolute timestamp (title attribute is sufficient). If `searchInfo`
   is unavailable or errors, **the footer row does not render at all** — absence,
-  never a guess.
+  never a guess. If `searchInfo` succeeds but `rebuiltAt` is `null`, the index has
+  **never been built**: the footer reads `Index not yet built ⓘ` and the no-results
+  body switches to the index-never-built copy above instead of blaming the user's
+  query.
 
 ### Compact omnibox (TopBar, every non-home route) and mobile
 
@@ -127,26 +143,24 @@ full-width beneath; `✕`/Esc closes it.
 - `PosterImage` / `FallbackArt` / `Monogram` — shared (DES-1).
 - `SearchFreshness` — the footer line; **exported standalone** so DES-3 mounts the
   identical component above its results grid.
-- `useUniversalSearch` — hook: debounced aliased query + client-side merge (below).
+- `useUniversalSearch` — hook: debounced single aliased document; union hits in
+  server order + prefix fill (Appendix A). People-only mode requests only the
+  `people` alias (used by DES-3's `PeopleFilter`).
 
 ## Behavior
 
 - **Trigger**: autocomplete fires at ≥2 characters, debounced **250ms** — observable
   as exactly one router request (the single aliased document) per settled keystroke
   burst. Under 2 characters the panel closes and no request is made.
-- **Merge heuristic (documented; replaceable when the union `search` field ships):**
-  both lists are requested pre-sorted by popularity server-side (`searchTitles`
-  default POPULARITY sort; `searchNames` popularity sort), 8 titles + 4 people.
-  Because name popularity is not yet a queryable field, the client cannot compare
-  numbers across lists; it merges positionally instead: **take 2 titles, then 1
-  person, repeating, preserving each list's server order, until 8 rows are filled;
-  when either list runs out, fill from the other.** One exception: if a person's
-  `primaryName` equals the query case-insensitively, that person is promoted to row 1.
-  Rationale: title popularity dominates in practice (this mirrors IMDb's own bar),
-  and the exact-name rule catches "searched for a specific person". When
-  name-popularity becomes queryable, replace the positional rule with a true numeric
-  merge on comparable popularity values — a one-function change inside
-  `useUniversalSearch`.
+- **Row assembly (union-first):** the panel's rows come from the unified
+  `search(query: $q, limit: 8)` union in **server order** — the server interleaves
+  titles and people and ranks them (text relevance, popularity breaking ties); the
+  client branches on `__typename` and invents no ordering. Because the union matches
+  whole words/stems, not prefixes (per `API-CHANGES.md`), a mid-word query like
+  `godf` legitimately returns zero union hits: the remaining rows fill from the two
+  prefix-backed aliases in the same document, ordered by Appendix A's rule and
+  deduped by `tconst`/`nconst` against union hits. Union rows and fill rows are
+  visually identical — the user sees one list.
 - **Keyboard**: `/` or `Cmd/Ctrl+K` focuses the omnibox from anywhere. With the panel
   open: `↓`/`↑` move selection (wrapping), `Enter` opens the selected row (row 1 is
   preselected by default), `Esc` closes the panel (a second `Esc` blurs the input),
@@ -154,10 +168,11 @@ full-width beneath; `✕`/Esc closes it.
   selection moves, focus doesn't (ARIA combobox with `aria-activedescendant`).
 - **Mouse**: hover moves selection; click opens the row. Clicking outside closes the
   panel. The input's `✕` clears text and closes the panel.
-- **Navigation**: a title row navigates to the title detail route, a person row to
-  the person detail route. This spec assumes `/title/:tconst` and `/name/:nconst`;
-  the literal scheme follows the architect's routing decision in
-  `docs/architecture.md` — the developer reads it there, not here.
+- **Navigation**: a title row navigates to `/title/:tconst`, a person row to
+  `/person/:nconst` (decided in `docs/architecture.md` → "Frontend routing & URL
+  scheme"). The route table also reserves `/search?q=…` for a full mixed-results
+  page; that surface is not designed by this spec — the union field (`limit` up to
+  50) is its ready-made data path if a follow-up spec picks it up.
 - **Images**: thumbs lazy-load; at most 8 OMDb requests per rendered panel (one per
   title row), and none for rows never rendered.
 - **Freshness fetch**: `searchInfo { rebuiltAt }` rides along in the same aliased
@@ -168,40 +183,52 @@ full-width beneath; `✕`/Esc closes it.
 
 ## Data needs
 
-One aliased document (field names to be verified against the live router /
-`API-CHANGES.md` before implementation, per the ticket):
+Field names verified against `imdb-federation/API-CHANGES.md` (landed, authoritative).
+One document, three aliases, one request per settled keystroke burst:
 
 ```graphql
 query UniversalSearch($q: String!) {
-  titles: searchTitles(
-    filter: { titlePrefix: $q }        # sort: POPULARITY is the default
-    first: 8
-  ) {
-    items {
-      id            # tconst — OMDb poster key + route param
+  hits: search(query: $q, limit: 8) {    # PRIMARY — server-ranked union
+    __typename                           # union SearchHit = Title | Name
+    ... on Title {
+      tconst          # OMDb poster key + /title/:tconst param
       primaryTitle
       startYear
-      titleType     # rendered as Movie / Series / …
+      titleType       # rendered as Movie / Series / …
       rating { averageRating numVotes }
     }
-  }
-  people: searchNames(
-    filter: { namePrefix: $q }
-    sort: POPULARITY
-    first: 4
-  ) {
-    items {
-      id            # nconst — route param + Monogram hash seed
+    ... on Name {
+      nconst          # /person/:nconst param + Monogram hash seed
       primaryName
-      primaryProfession   # → professions metadata line (verify field name/shape)
+      primaryProfession   # → professions metadata line (verify exact field/shape)
     }
   }
-  searchInfo { rebuiltAt }   # ISO timestamp assumed; folded IMDB-13
+  titles: searchTitles(filter: { titlePrefix: $q }, limit: 8) {   # fill (Appendix A)
+    items { tconst primaryTitle startYear titleType
+            rating { averageRating numVotes } }
+  }
+  people: searchNames(filter: { namePrefix: $q }, limit: 4) {     # fill (Appendix A)
+    items { nconst primaryName primaryProfession }
+  }
+  searchInfo { rebuiltAt }   # ISO timestamp, or null = never built — folded IMDB-13
 }
 ```
 
-Gaps this spec depends on the brief's stated facts for: (1) **name popularity is not
-queryable** — handled by the documented positional merge; (2) poster URLs are
-constructed client-side as `https://img.omdbapi.com/?i=<tconst>&apikey=db1f8efc`
-(key public by design); (3) exact filter/sort/paging argument names are
-introspection-verified by the developer, not guessed from this spec.
+Notes: (1) name popularity is now **materialized server-side** (`searchNames` defaults
+to `POPULARITY_DESC` = sum of known-for vote counts), so both fill lists arrive in true
+popularity order and the client never compares popularity across lists; (2) poster URLs
+are constructed client-side as `https://img.omdbapi.com/?i=<tconst>&apikey=db1f8efc`
+(key public by design); (3) the union excludes adult titles, and both the union query
+and the prefix filters require ≥2 characters — matching the panel's ≥2-char trigger.
+
+## Appendix A — prefix fill order (the demoted client merge)
+
+Until the union field shipped, this heuristic *was* the row order; it is now only the
+order in which prefix-only hits fill the rows the union leaves empty (all 8 of them
+while the user is mid-word). Both prefix lists arrive popularity-sorted server-side:
+**take 2 titles, then 1 person, repeating, preserving each list's server order,
+skipping ids already shown as union hits, until 8 rows are filled; when either list
+runs out, fill from the other.** The old exact-name promotion rule is retired — an
+exactly-typed name is a whole word, so the union's server relevance ranks it first
+without client help. If the union ever gains prefix semantics, delete this appendix
+and the two fill aliases; the change stays contained in `useUniversalSearch`.
