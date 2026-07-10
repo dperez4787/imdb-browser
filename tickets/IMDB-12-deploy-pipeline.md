@@ -1,7 +1,7 @@
 ---
 id: IMDB-12
 title: Deploy pipeline — Firebase Hosting + Cloud Run via OIDC/WIF
-status: needs-architecture
+status: backlog
 owner: product-owner
 depends-on: [IMDB-1, IMDB-10]
 branch: ""
@@ -50,3 +50,21 @@ exact provisioning steps/values for the user to run, then wiring the workflow to
 - **product-owner** — filed. `needs-architecture`: blocked on the OPEN "GCP
   provisioning for this repo" section; the actual provisioning/IAM commands are
   user-run by policy. Needs IMDB-1 (something to host) and IMDB-10 (an image to ship).
+- **architect** — architecture settled; status → `backlog` (deliberately NOT
+  ready-for-dev). The "GCP provisioning for this repo" section of
+  `docs/architecture.md` now lists every resource and the exact user-run commands:
+  same project as the rest of the stack (`project-d60a83c1-2c60-4d51-ad0`,
+  us-central1 — required by the router-auth decision, since the router's JWT audience
+  is that Firebase project), new WIF provider `github-provider-imdbbrowser` in the
+  existing `github-pool`, deploy SA `imdb-browser-deploy` (4 roles + WIF binding),
+  runtime SA `imdb-browser-run` (secret-scoped accessor only), AR repo
+  `imdb-browser`, secret `ANTHROPIC_API_KEY`, second Firebase Hosting site
+  `imdb-browser` + new Web App + Auth authorized domain, GitHub secrets
+  `WIF_PROVIDER`/`DEPLOY_SA`; Cloud Run service `imdb-browser-chat` is CI-created,
+  never hand-provisioned. Why still blocked: AC 1 requires the user to have RUN those
+  steps (IAM is user-run by policy) and depends-on IMDB-1/IMDB-10 are unmerged — flip
+  to `ready-for-dev` once the user logs provisioning complete on this ticket and the
+  dependencies merge. Developer note for then: use a named hosting target
+  (`hosting:imdb-browser`) since the project's default site belongs to
+  linear-example; mirror linear-example `deploy.yml` otherwise (id-token: write,
+  SHA-tagged image, pinned firebase-tools, deploy from repo root).
