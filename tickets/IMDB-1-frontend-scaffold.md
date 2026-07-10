@@ -1,11 +1,11 @@
 ---
 id: IMDB-1
 title: Frontend scaffold — Vite React SPA with test setup
-status: in-progress
+status: in-review
 owner: product-owner
 depends-on: []
 branch: "imdb-1-frontend-scaffold"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/1"
 ---
 
 ## Description
@@ -46,3 +46,15 @@ shell that renders a placeholder screen.
   decision touched, so `ready-for-dev`. Router choice deliberately excluded (OPEN in
   docs/architecture.md).
 - **developer** — claimed. Branch `imdb-1-frontend-scaffold` off `main`.
+- **developer** — implemented; draft PR https://github.com/dperez4787/imdb-browser/pull/1.
+  Files: `.nvmrc` (repo root, Node 24 LTS), `app/frontend/{package.json,
+  package-lock.json, vite.config.js, index.html, .gitignore}`, `app/frontend/src/
+  {main.jsx, App.jsx, App.test.jsx, setupTests.js, graphql/index.js}`. Vite 8 +
+  React 19, Vitest 4 + Testing Library (config in `vite.config.js` via
+  `vitest/config`; jest-dom matchers via `setupTests.js`). `src/graphql/index.js`
+  is a comment-only stub marking the sanctioned GraphQL boundary. Verified locally
+  on Node v24.18.0: `npm ci` clean; `npm test` 1/1 passing (App renders heading +
+  tagline); `npm run build` clean; `npm run dev` served — curl confirmed index.html
+  and the transformed App module with the placeholder markup. No `fetch()`/GraphQL/
+  Firebase anywhere (grep-checked). Skipped/not done on purpose: no router, no CSS
+  framework, no real-browser console check (curl + Testing Library only).
