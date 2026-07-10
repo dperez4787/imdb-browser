@@ -1,7 +1,7 @@
 ---
 id: IMDB-6
 title: Faceted title search view
-status: needs-architecture
+status: ready-for-dev
 owner: product-owner
 design: designs/DES-3-faceted-title-search.md
 depends-on: [IMDB-4]
@@ -62,3 +62,15 @@ image-missing / error states.
   enumerates the state dimensions that must round-trip through the URL, but the URL
   encoding itself is the OPEN "Frontend routing & state" decision — moving to
   `needs-architecture` until the architect lands it (spec stays `draft` till then).
+- **ui-ux-designer** — architecture landed: `docs/architecture.md` → "Frontend
+  routing & URL scheme" fixes the `/titles` encoding (params mirror
+  `TitleSearchFilter` names, comma-separated multi-values, defaults omitted, 1-based
+  `page`, page size 24, offset ≤ 10k), and `imdb-federation/API-CHANGES.md` (landed,
+  authoritative) adds contextual facet counts plus capped totals
+  (`total`/`totalIsCapped`). DES-3 revised in place: exact URL mapping, live
+  per-filter checkbox counts via `facets(dimensions: [GENRES, TITLE_TYPES])`,
+  `10,000+ titles` / `Page N of 417+` capped displays, 24-per-page grid (6 columns
+  wide), and a dedicated index-never-built empty state (`searchInfo.rebuiltAt` is
+  `null` until the user runs imdb-federation's rebuild — a verified prerequisite for
+  demoing this view). Spec `approved`; both blockers cleared → `ready-for-dev`
+  (depends-on IMDB-4 still orders the work).
