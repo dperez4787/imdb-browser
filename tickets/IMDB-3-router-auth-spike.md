@@ -5,7 +5,7 @@ status: in-review
 owner: product-owner
 depends-on: []
 branch: "architecture-round-1"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/3"
 ---
 
 ## Description
