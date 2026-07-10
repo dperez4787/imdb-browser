@@ -1,7 +1,7 @@
 ---
 id: IMDB-9
 title: Person visual treatment — known-for poster mosaic vs placeholder
-status: needs-design
+status: ready-for-dev
 owner: product-owner
 design: designs/DES-6-person-visual-treatment.md
 depends-on: [IMDB-5, IMDB-8]
@@ -61,3 +61,13 @@ IMDB-5 and IMDB-8.
   exposure, OMDb request budget, no-new-query assumption) are being verified by the
   architect in parallel — the main session reconciles this ticket once those facts
   land in `docs/architecture.md`.
+- **ui-ux-designer** — feasibility confirmed: `docs/architecture.md` → "Person
+  visuals — data facts & OMDb budget" verifies live that `Name.knownForTitles`
+  returns ≤4 hydrated titles (tconst, primaryTitle, startYear, rating.numVotes) in
+  the same query at zero extra GraphQL cost, and adopts the proposed budgets (≤4
+  posters per person page, ≤1 per person card lazy, 0 in autocomplete, instant
+  fallback on 404). DES-6's tiered treatment is now **the decision**: 2×2 known-for
+  mosaic on the person page header, single most-voted-known-for poster + monogram
+  badge on person cards, monogram floor everywhere; the monogram-everywhere
+  contingency is retired. Spec `approved` → `ready-for-dev` (depends-on
+  IMDB-5/IMDB-8 unchanged — this upgrades what they ship).
