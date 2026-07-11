@@ -1,7 +1,7 @@
 ---
 id: IMDB-4
 title: GraphQL client layer for the SPA
-status: in-review
+status: in-progress
 owner: product-owner
 depends-on: [IMDB-1, IMDB-2, IMDB-3]
 branch: "imdb-4-graphql-client-layer"
@@ -93,3 +93,53 @@ and IMDB-2's auth (the credential presumably derives from the signed-in Firebase
   (with the useful nested message surfaced), not `bad-request`; errors.js
   already scans nested errors, so router-side passthrough fixes this with no
   client change. Did not touch AppShell/TopBar/chat files (IMDB-11 partition).
+- **tester** — verified against the ACs (2026-07-10). Wrote independent acceptance
+  tests (`src/graphql/tester-acceptance.test.js` + gated
+  `src/graphql/live-router.integration.test.js`, commit `4134a3d`): raw-fetch
+  credential-attach inspection, signed-out guard for every falsy token, all six
+  normalization branches through `execute()`, query-key collision checks, and a
+  regression guard that no committed operation document selects the
+  fieldAuth-denied `Rating.numVotes`/`Name.birthYear`/`Name.deathYear`.
+  Commands: `npm ci && npm test` → **100 pass / 5 skipped (the gated live suite),
+  exit 0** on a clean checkout; `npm run build` → exit 0;
+  `LIVE_ROUTER_TOKEN="$(gcloud auth print-identity-token)" npx vitest run
+  src/graphql/live-router.integration.test.js` → **5/5 pass** against the LIVE
+  router through the REAL client module (only `getIdToken()` substituted with a
+  Google OIDC token, the other accepted JWKS provider per IMDB-3).
+  Per-criterion:
+  - AC1 real query against the live router through the client module — **PASS
+    with a Google OIDC credential; Firebase-ID-token path NOT VERIFIED** (needs
+    an interactive Google sign-in). Live: `searchInfo.rebuiltAt`
+    2026-07-11T03:12:24.167Z, titleCount 12,629,478, nameCount 15,475,639;
+    `searchTitles` "godfather" returns hits; union `search` "pacino" returns
+    Name+Title results; `title(tt0068646)` hydrates The Godfather with rating,
+    directors, principals through federation.
+  - AC2 credential attach per IMDB-3 + no request while signed out — **PASS**:
+    header is exactly `Authorization: Bearer <getIdToken()>` (raw fetch call
+    inspected), token fetched per request, and for token = null/undefined/''
+    the promise rejects kind `auth` with **zero** fetch calls. Live: anonymous
+    POST (no header) → HTTP 401 `{"errors":[{"message":"unauthorized"}]}`;
+    invalid bearer through the real module → normalized kind `auth` (live test).
+  - AC3 everything under `src/graphql/`, no fetch()/inline GraphQL in
+    components — **PASS**: grep clean outside the boundary; enforced in-suite by
+    `scaffold-conventions.test.js`.
+  - AC4 one documented normalized error shape, unit-tested with mocked
+    transport — **PASS**: `{kind: auth|network|graphql|bad-request, message,
+    errors}` proved on every branch, both via `normalizeError()` (developer) and
+    through `execute()` with a stubbed fetch (tester), including the live 403
+    PERMISSION_DENIED shape.
+  - AC5 colocated unit tests pass in `npm test` — **PASS** (100/100 hermetic).
+  Field-governance evidence (recorded, not a ticket failure): probing
+  `Rating.numVotes` live returns HTTP 403 with
+  `{"errors":[{"extensions":{"code":"PERMISSION_DENIED","deniedFields":
+  ["Rating.numVotes"]},"message":"not authorized to read: Rating.numVotes"}]}`
+  — note this normalizes to kind `auth` (403 mapping), so a future governed-field
+  regression would surface to views as an auth error; the committed documents
+  select none of the three governed fields (regression-guarded in my suite), and
+  all live queries ran denial-free. Verdict: everything verifiable passed; the
+  Firebase-ID-token end-to-end criterion is NOT VERIFIED and requires a human:
+  sign in with Google in the running app and watch a `searchInfo` query succeed
+  (e.g. via the network tab or the IMDB-13 freshness indicator once built). PR #8
+  therefore STAYS A DRAFT and the ticket returns to `in-progress`, same
+  precedent as IMDB-2/IMDB-10 — the user may judge the live evidence sufficient
+  and merge.
