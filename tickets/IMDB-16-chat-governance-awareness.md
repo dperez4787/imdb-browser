@@ -1,8 +1,9 @@
 ---
 id: IMDB-16
 title: Chat — flag governed fields conversationally, never guess them
-status: backlog
+status: ready-for-dev
 owner: product-owner
+design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-10, IMDB-11]
 branch: ""
 pr: ""
@@ -73,3 +74,44 @@ guidance it becomes the best possible explainer of governance.
   IMDB-14 only for the shared restricted-treatment vocabulary in the chat UI; the
   backend tasks (1, 3, 4) have no dependency beyond the chat scaffold and can land
   first.
+- **product-owner** — triaged. Dependencies verified: IMDB-10 (PR #5) and IMDB-11
+  (PR #9) are both merged. Status → **`needs-design`**, but narrowly: the backend
+  scope (system-prompt contract, SSE `tool` event `governance` payload, retry
+  hygiene, token-passthrough regression guard) is fully settled by this ticket plus
+  the IMDB-10 contract and needs no design or architecture pass. What is
+  underspecified is the **streamed governance badge in the chat transcript**:
+  DES-7 (the approved chat spec) renders streamed text only — it defines no
+  tool-event display at all — and DES-8 defines `RestrictedValue` as an inline pill
+  occupying a replaced value's line box, not a message-level badge on a streaming
+  reply. "Badge the message with the DES-8 vocabulary" therefore has no approved
+  answer for where the badge sits, when it appears mid-stream, or its copy. Designer
+  ask (small DES-7 addendum reusing DES-8's vocabulary): placement of the governance
+  badge on an assistant message whose tool call was redacted, its appearance timing
+  during streaming, copy, and multi-redaction handling. Once that addendum is
+  approved and linked via `design:`, this flips to `ready-for-dev` as one ticket —
+  the backend and UI halves ship together as the demo slice, and the AC wording
+  ("the chat UI shows the governance badge on the tool event") already binds them.
+  Note for the developer, echoing the filer: the user-token passthrough on
+  mcp-graphql calls is the governance guarantee — task 4's regression test is
+  non-negotiable scope.
+- **ui-ux-designer** — design settled: DES-7 revised in place with **"Addendum —
+  streamed governance badge (IMDB-16)"** (`designs/DES-7-chat-concierge.md`); the
+  addendum also formally adopts `ToolIndicator` (built under IMDB-11) into DES-7's
+  inventory and records that tool lines are draft-only. The PO's open questions,
+  answered there: *placement* — `GovernanceBadge` renders as the **last line of the
+  assistant message** (appended below the streaming text/caret, so already-read text
+  never shifts) and **persists on the committed message** — it cannot ride the tool
+  line, which drops at commit; *timing* — appears the moment the first `tool` event
+  with non-empty `governance.redactedFields` arrives, mid-stream; *copy* —
+  DES-8-adapted mark (static hatch swatch + lock at 2em, never animated, no amber)
+  leading muted 12px `Restricted for your role:` + coordinates in code style (a
+  stated, deliberate divergence from DES-8's never-show-coordinates rule: chat has
+  no call-site label, the prose is the human layer, and the raw coordinates are the
+  corroboration), tooltip on hover+focus with full list and the "it sees exactly
+  what you see / ask again after a grant" copy; *multi-redaction* — one badge per
+  message, deduped first-seen **union** across all (≤8) tool events, growing in
+  place, never duplicated. Default no-governance case renders nothing — no DOM, no
+  reserved space. The AC phrase "the chat UI shows the governance badge on the tool
+  event" is satisfied by this message-foot badge driven by the tool event; quote the
+  addendum's Behavior section for the verifiable wording. Status →
+  **`ready-for-dev`**; `design:` set.
