@@ -1,7 +1,7 @@
 ---
 id: IMDB-3
 title: Architecture spike — how the browser authenticates to the cosmo router
-status: in-review
+status: done
 owner: product-owner
 depends-on: []
 branch: "architecture-round-1"
@@ -58,3 +58,4 @@ view that fetches data.
   exercise live, which is exactly IMDB-4's first acceptance criterion. Status
   `in-review` on PR branch `architecture-round-1`; tester/user can close once IMDB-4
   demos the Firebase-token request end-to-end.
+- **main session** (board bookkeeping, 2026-07-11) — resolved by the architecture round (PR #3): Firebase ID token direct to the router, verified live; the residual live Firebase-token demo is covered by the deferred-to-testing-period directive and by IMDB-5 shipping the live data path. Status → done.
