@@ -1,10 +1,10 @@
 ---
 id: IMDB-15
 title: Chat backend CORS headers so browsers can call /api/chat cross-origin
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 depends-on: []
-branch: ""
+branch: "imdb-15-chat-backend-cors"
 pr: ""
 ---
 
@@ -64,3 +64,8 @@ is the recorded default; note any deviation in the Log and in
   from the SPA fail preflight. `ready-for-dev` — no UI, and the CORS decision
   follows the router precedent already recorded in `docs/architecture.md` (wildcard
   allow-origin, bearer auth, no credentials). No dependencies; `app/chat` is merged.
+- **developer** — claimed. Plan: a small dedicated CORS middleware module
+  (`app/chat/src/cors.js`) mounted first in `createApp`, wildcard allow-origin per
+  the router precedent, OPTIONS short-circuited to 204 before auth, no
+  `Allow-Credentials` ever; colocated `node:test` coverage plus a credential-less
+  boot + curl verification.
