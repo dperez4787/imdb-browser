@@ -1,10 +1,10 @@
 ---
 id: IMDB-10
 title: Chat backend scaffold — Anthropic agentic loop with GraphQL MCP on Cloud Run
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 depends-on: []
-branch: ""
+branch: "imdb-10-chat-backend-scaffold"
 pr: ""
 ---
 
@@ -70,3 +70,5 @@ dedicated modules per CLAUDE.md.
   orchestrator's search collections have never been rebuilt (`searchInfo.rebuiltAt`
   is null, verified live) — the user must run imdb-federation `./scripts/rebuild.sh`
   before search-dependent questions return data.
+- **developer** — claimed. Branch `imdb-10-chat-backend-scaffold`. Implementing per
+  the "Chat backend API contract" section of `docs/architecture.md`.
