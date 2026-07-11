@@ -1,7 +1,7 @@
 ---
 id: IMDB-14
 title: Governance-denied fields — client 'denied' handling + shared restricted-field treatment
-status: in-review
+status: done
 owner: product-owner
 design: designs/DES-8-restricted-field-treatment.md
 depends-on: [IMDB-4]
@@ -172,3 +172,67 @@ invisible for an hour and wreck the demo.
   architect: `docs/architecture.md` § Field-level governance still specifies
   strip-and-retry and the 403 shape as primary — needs the redact-mode amendment
   (not rewritten here; architect-owned).
+- **tester** — verdict: **all agent-verifiable criteria PASS**; ticket → `done`,
+  PR #13 approved and taken out of draft per the user's 2026-07-11 directive
+  (human-only live criteria deferred to the upcoming testing period). Verified
+  against the amended contract — the governance-platform notice above and
+  `docs/architecture.md` § Field-level governance as merged to main via PR #12
+  (this branch's local copy predates that merge; the PR does not touch the file,
+  so main's version governs and no conflict exists). Own suites added
+  (`IMDB-14:`-prefixed commit): `src/imdb14-acceptance.tester.test.jsx` (hooks
+  contract proven through the REAL client with only auth.js/fetch faked — not a
+  mocked client.js), `src/graphql/imdb14-live.tester.test.js` (token-gated live
+  probes), and a rewrite of IMDB-4's stale "denied fields never selected" guard
+  in `tester-acceptance.test.js` (it enforced the superseded reject-mode policy;
+  now enforces the co-selection document-style rule). Per criterion:
+  1. **Denial surfaces with coordinates — PASS.** Under the live redact
+     contract the primary surface is `deniedFields` on a successful result
+     (unit: developer's `client.test.js` + my full-stack probes), with kind
+     `denied` as the reject-mode fallback (unit, both suites). LIVE
+     (2026-07-11-dated policy rev 8, Google OIDC token, real client module):
+     `Rating.numVotes` query → resolved (HTTP 200 — `rawRequest` rejects
+     non-2xx; raw curl cross-check `HTTP 200`,
+     `extensions.governance.redactedFields:["Rating.numVotes"]`, `revision: 8`,
+     `x-imdb-policy-revision: 8`), `numVotes` absent from `data`,
+     `deniedFields === ['Rating.numVotes']`. My additional live probes:
+     alias-aware (`votes: numVotes` absent under its alias, reported under its
+     coordinate) and three-coordinate union (`Name.birthYear`,
+     `Name.deathYear`, `Rating.numVotes` from one document, per-element
+     absence across `knownForTitles`) — 10/10 live tests green.
+  2. **Never presented as auth — PASS.** Ordering proven at the unit seam
+     (403+PERMISSION_DENIED → `denied` never `auth`; bare 401/403 → `auth`;
+     union deduplicated across multiple errors) in my suite, the developer's,
+     and live (invalid token → `auth`).
+  3. **Mixed query never blanked — PASS.** Unit (through the real client) and
+     LIVE: with `numVotes` denied, `primaryTitle`/`startYear`/`averageRating`
+     all resolve; one round trip, no retry. Mechanism documented in
+     `src/graphql/client.js`/`queries.js`/`hooks.js` headers.
+  4. **RestrictedValue per DES-8 — PASS** at component level: inline + line
+     variants, tooltip on hover AND keyboard focus with the spec copy, Esc
+     with focus retained, SR text `"<Label>: restricted by data governance."`,
+     aria-hidden decoration, static (no animation asserted in the DOM and
+     against the committed `styles.css` section — no
+     animation/keyframes/transition), `isRestricted` whole-coordinate matching
+     (never substrings/bare leaves), exported for reuse. DES-8's confusion
+     rule has explicit coverage: my two-rule-contract demo proves
+     denied-coordinate → pill renders vs null-and-not-denied → silent absence.
+     Caveat: verified in jsdom; in-browser pixel rendering rides with the
+     deferred browser path (no view consumes the component until IMDB-7/8).
+  5. **Live grant flip — NOT VERIFIED, deferred** (user directive 2026-07-11:
+     human-only live criteria move to the upcoming testing period; the user
+     operates the governance console). Per this AC's own fallback clause the
+     caching-seam tests stand in and PASS: function-form staleTime resolves
+     60 s iff the cached envelope reports denials (1 h entities / 5 m searches
+     otherwise), installed on real rendered hooks; `denied` non-retryable at
+     TanStack; full optimistic document re-sent every fetch (grant-detection).
+  6. **Suite green, boundary clean — PASS.** Clean checkout `npm ci && npm
+     test`: exit 0, 217 passed / 13 skipped (token-gated live suites);
+     with `LIVE_ROUTER_TOKEN`: 227 passed / 3 skipped, exit 0; `npm run build`
+     exit 0. Repo search: no `extensions`/raw-error parsing outside
+     `src/graphql/` (only my test fixtures at `src/` fabricate transport
+     responses; no component touches them), no `fetch()` outside sanctioned
+     boundaries, no inline query strings in components (comment-only matches).
+  Also NOT VERIFIED (unchanged from the developer's list, both deferred or
+  structurally untriggerable): browser/Firebase-token path (no consuming view
+  yet), reject mode live (redact mode makes it unreachable via queries —
+  unit-only by design).
