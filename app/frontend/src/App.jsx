@@ -1,28 +1,35 @@
 /**
- * App composition root (IMDB-2): everything user-visible lives inside the
- * AuthGate, so signed-out users see exactly one thing — the sign-in screen.
- *
- * Still deliberately feature-empty behind the gate: routing arrives with the
- * first routed view (docs/architecture.md, "Frontend routing & URL scheme"),
- * data fetching with IMDB-4's GraphQL client. The placeholder below makes zero
- * network requests.
+ * App composition root: everything user-visible lives inside the AuthGate, so
+ * signed-out users see exactly one thing — the sign-in screen. Inside the
+ * gate, the route table from docs/architecture.md ("Frontend routing & URL
+ * scheme"): `/` is the universal search (IMDB-5), `/search` is the reserved
+ * mixed-results placeholder, and `/title/:tconst` / `/person/:nconst` are
+ * placeholders until IMDB-7/IMDB-8 land. The BrowserRouter lives in main.jsx
+ * so tests can mount App inside a MemoryRouter.
  */
+import { Route, Routes } from 'react-router';
+
 import AppShell from './AppShell.jsx';
 import { AuthProvider } from './AuthContext.jsx';
 import AuthGate from './AuthGate.jsx';
+import NotFoundPage from './NotFoundPage.jsx';
+import PersonPage from './people/PersonPage.jsx';
+import HomePage from './search/HomePage.jsx';
+import SearchPage from './search/SearchPage.jsx';
+import TitlePage from './title/TitlePage.jsx';
 
 export default function App() {
   return (
     <AuthProvider>
       <AuthGate>
         <AppShell>
-          <section className="home-placeholder">
-            <h1>Now showing: nothing yet</h1>
-            <p>
-              Browsing over the federated IMDb graph arrives with the next
-              tickets. You are signed in, and the marquee is lit.
-            </p>
-          </section>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/title/:tconst" element={<TitlePage />} />
+            <Route path="/person/:nconst" element={<PersonPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
         </AppShell>
       </AuthGate>
     </AuthProvider>

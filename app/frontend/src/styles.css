@@ -750,6 +750,419 @@ body {
   }
 }
 
+/* ======================================================================
+   IMDB-5 — Universal search (DES-2): omnibox, autocomplete panel, result
+   rows, fallback art, freshness footer, route placeholders.
+   Appended as one delimited section per this round's file partition.
+   ====================================================================== */
+
+/* ---- Home route: hero omnibox (DES-2) --------------------------------- */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+  margin: 14vh auto 0;
+  max-width: 640px;
+}
+
+.home__wordmark {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.home__wordmark .wordmark {
+  font-size: inherit;
+}
+
+.home__browse {
+  margin: 0;
+}
+
+.home__browse a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.home__browse a:hover {
+  color: var(--text);
+}
+
+/* ---- Omnibox ----------------------------------------------------------- */
+
+.omnibox {
+  position: relative;
+}
+
+.omnibox--hero {
+  width: 100%;
+  max-width: 640px;
+}
+
+.omnibox--compact {
+  max-width: 480px;
+  margin-left: auto;
+}
+
+.omnibox__field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+
+.omnibox--hero .omnibox__field {
+  height: 52px;
+  font-size: 1.05rem;
+}
+
+.omnibox--compact .omnibox__field {
+  height: 36px;
+  font-size: 0.9rem;
+}
+
+.omnibox__field:focus-within {
+  border-color: var(--amber);
+}
+
+.omnibox__icon {
+  flex: none;
+  opacity: 0.7;
+}
+
+.omnibox__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+}
+
+.omnibox__input:focus {
+  outline: none; /* the field's focus-within border carries the focus state */
+}
+
+.omnibox__input::placeholder {
+  color: var(--muted);
+}
+
+.omnibox__kbd {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.75em;
+  line-height: 1.6;
+}
+
+.omnibox__clear {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.omnibox__clear:hover {
+  color: var(--text);
+}
+
+/* Mobile toggle: hidden at desktop widths; the compact field collapses to it
+   below 720px (DES-2 "Compact omnibox and mobile"). */
+.omnibox__mobile-toggle {
+  display: none;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 6px;
+}
+
+@media (max-width: 720px) {
+  .omnibox--compact .omnibox__mobile-toggle {
+    display: block;
+    margin-left: auto;
+  }
+
+  .omnibox--compact .omnibox__field {
+    display: none;
+  }
+
+  .omnibox--compact.omnibox--mobile-open .omnibox__field {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    height: 56px;
+    border-radius: 0;
+    border-width: 0 0 1px;
+  }
+
+  .omnibox--compact.omnibox--mobile-open .autocomplete-panel {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    width: auto;
+    border-radius: 0;
+  }
+}
+
+/* ---- Autocomplete panel ------------------------------------------------- */
+
+.autocomplete-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 20;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
+}
+
+.omnibox--hero .autocomplete-panel {
+  left: 0;
+  right: 0;
+}
+
+.omnibox--compact .autocomplete-panel {
+  right: 0;
+  width: 480px;
+  max-width: 90vw;
+}
+
+/* Refetch with previous rows on screen: 2px amber bar along the top edge. */
+.autocomplete-panel__progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 40%;
+  background: var(--amber);
+  animation: panel-progress 1s linear infinite;
+}
+
+@keyframes panel-progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.autocomplete-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.autocomplete-panel__message {
+  padding: 1rem 1.25rem;
+  color: var(--muted);
+}
+
+.autocomplete-panel__message p {
+  margin: 0 0 0.5rem;
+}
+
+.autocomplete-panel__message p:first-child {
+  color: var(--text);
+}
+
+.autocomplete-panel__hint {
+  font-size: 0.85rem;
+}
+
+.autocomplete-panel__retry {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+
+.autocomplete-panel__retry:hover {
+  border-color: var(--amber);
+}
+
+/* ---- Result rows --------------------------------------------------------- */
+
+.search-hit {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 6px 12px 6px 10px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.search-hit--selected {
+  border-left-color: var(--amber);
+  background: rgb(255 255 255 / 0.06);
+}
+
+.search-hit__thumb {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.search-hit__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-hit__primary {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-hit__meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Poster image + fallback art (DES-1 shared units) ------------------- */
+
+.poster-image {
+  display: block;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--hairline);
+}
+
+.fallback-art {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text);
+  font-weight: 600;
+  user-select: none;
+}
+
+.fallback-art[data-kind='title'] {
+  border: 1px dashed rgb(255 255 255 / 0.18);
+}
+
+.fallback-art__glyph {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  opacity: 0.7;
+  line-height: 0;
+}
+
+/* ---- Skeleton rows (first-load shimmer) ---------------------------------- */
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 6px 12px;
+}
+
+.skeleton-row__thumb {
+  flex: none;
+  width: 40px;
+  height: 60px;
+  border-radius: 6px;
+}
+
+.skeleton-row__text {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.skeleton-row__thumb,
+.skeleton-row__text {
+  background: linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0.05) 25%,
+    rgb(255 255 255 / 0.12) 50%,
+    rgb(255 255 255 / 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---- Freshness footer (SearchFreshness — IMDB-13) ------------------------ */
+
+.search-freshness {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 6px 12px;
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.search-freshness__info {
+  cursor: help;
+}
+
+/* ---- Route placeholders --------------------------------------------------- */
+
+.route-placeholder {
+  max-width: 32rem;
+  margin: 4rem auto;
+  text-align: center;
+}
+
+.route-placeholder p {
+  color: var(--muted);
+}
+
+.route-placeholder a {
+  color: var(--amber);
+}
+
+/* ---- Motion (IMDB-5 additions) -------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .autocomplete-panel__progress,
+  .skeleton-row__thumb,
+  .skeleton-row__text {
+    animation: none;
+  }
+}
+
+/* ================= end IMDB-5 universal search section ================= */
+
 /* ======================================================================== */
 /* ---- RestrictedValue (IMDB-14 / DES-8) — appended section -------------- */
 /* The redaction pill for governance-denied fields. STATIC by design: the   */

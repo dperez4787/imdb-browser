@@ -16,7 +16,9 @@
  *   DES-1 — inline sign-in error (popup closed / network), in-flight state,
  *            initial focus, UserMenu keyboard contract (Esc + focus return).
  */
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.jsx';
@@ -25,6 +27,20 @@ import {
   signOutUser,
   subscribeToAuth,
 } from './auth.js';
+import { createQueryClient } from './graphql/queryClient.js';
+
+// Since IMDB-5, App mounts a route table and the omnibox's query hook, so the
+// composition needs the same providers main.jsx supplies in production
+// (QueryClient + a router). Mechanical wrapper only — every assertion below
+// is unchanged, and no test types into the omnibox, so still zero network.
+const renderApp = () =>
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 
 vi.mock('./auth.js', () => ({
   subscribeToAuth: vi.fn(),
@@ -72,7 +88,7 @@ const signInButton = () =>
 
 describe('AC3 / DES-1 — the curtain (auth resolving, no flash of either screen)', () => {
   it('renders only the curtain until the auth subscription first fires', () => {
-    render(<App />);
+    renderApp();
 
     // Neither the sign-in screen nor any shell chrome exists yet.
     expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
@@ -82,7 +98,7 @@ describe('AC3 / DES-1 — the curtain (auth resolving, no flash of either screen
   });
 
   it('resolving signed-in goes curtain → shell with the sign-in screen never mounting', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(googleUser));
 
     expect(screen.getByRole('banner')).toBeVisible();
@@ -91,7 +107,7 @@ describe('AC3 / DES-1 — the curtain (auth resolving, no flash of either screen
   });
 
   it('resolving signed-out goes curtain → sign-in with the shell never mounting', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     expect(signInButton()).toBeVisible();
@@ -102,7 +118,7 @@ describe('AC3 / DES-1 — the curtain (auth resolving, no flash of either screen
 
 describe('AC1 — signed out, the sign-in screen is the only reachable surface', () => {
   it('shows the designed sign-in card and nothing else from the app', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     expect(signInButton()).toBeVisible();
@@ -119,7 +135,7 @@ describe('AC1 — signed out, the sign-in screen is the only reachable surface',
   });
 
   it('makes zero data or image requests signed-out (DES-1: pure-CSS ornament)', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -127,7 +143,7 @@ describe('AC1 — signed out, the sign-in screen is the only reachable surface',
   });
 
   it('puts initial focus on the Google button (DES-1 keyboard/focus)', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     expect(signInButton()).toHaveFocus();
@@ -136,7 +152,7 @@ describe('AC1 — signed out, the sign-in screen is the only reachable surface',
 
 describe('AC2 — completing Google sign-in lands in the shell with identity + sign-out', () => {
   it('click → popup resolves → shell renders with the user identity visible', async () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     await act(async () => {
@@ -163,7 +179,7 @@ describe('AC2 — completing Google sign-in lands in the shell with identity + s
   });
 
   it('shows the Google photo avatar when photoURL is present', () => {
-    render(<App />);
+    renderApp();
     act(() =>
       emitAuth({ ...googleUser, photoURL: 'https://example.com/me.jpg' }),
     );
@@ -178,7 +194,7 @@ describe('AC2 — completing Google sign-in lands in the shell with identity + s
 
 describe('AC4 — signing out returns immediately to the sign-in screen', () => {
   it('UserMenu → Sign out → sign-in screen, shell gone, menus discarded', async () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(googleUser));
 
     fireEvent.click(screen.getByRole('button', { name: 'Account: Danny Perez' }));
@@ -201,7 +217,7 @@ describe('DES-1 — sign-in error and in-flight states', () => {
   ])(
     'renders the inline "Couldn\'t sign in — … Try again." message for %s, button re-enabled',
     async (code, reason) => {
-      render(<App />);
+      renderApp();
       act(() => emitAuth(null));
 
       signInWithGoogle.mockRejectedValueOnce({ code });
@@ -220,7 +236,7 @@ describe('DES-1 — sign-in error and in-flight states', () => {
   );
 
   it('disables the button with an inline spinner while the popup is in flight', async () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     let finish;
@@ -243,7 +259,7 @@ describe('DES-1 — sign-in error and in-flight states', () => {
   });
 
   it('a failed attempt is retryable and the retry can succeed', async () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(null));
 
     signInWithGoogle.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
@@ -262,7 +278,7 @@ describe('DES-1 — sign-in error and in-flight states', () => {
 
 describe('DES-1 — UserMenu keyboard contract', () => {
   it('opens with focus on Sign out, closes on Esc with focus returned to the avatar', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(googleUser));
 
     const avatar = screen.getByRole('button', { name: 'Account: Danny Perez' });
@@ -277,7 +293,7 @@ describe('DES-1 — UserMenu keyboard contract', () => {
   });
 
   it('traps Tab while the menu is open', () => {
-    render(<App />);
+    renderApp();
     act(() => emitAuth(googleUser));
 
     fireEvent.click(screen.getByRole('button', { name: 'Account: Danny Perez' }));
