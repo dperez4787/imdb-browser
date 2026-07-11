@@ -348,3 +348,84 @@ test('AC-loop-guardrails: through HTTP, the real agent loop uses the contract mo
   assert.equal(events.at(-1).event, 'done')
   assert.equal(mcpClosed, 1)
 })
+
+// --- IMDB-16 (tester): governance rides the tool frame, additive at the WIRE ----
+//
+// governance.test.js proves the emit() seam; this proves the actual SSE bytes:
+// through HTTP, a redacted tool call's frame carries EXACTLY {name, governance}
+// with governance EXACTLY {redactedFields}, a clean call's frame stays EXACTLY
+// {name} (no key, not an empty one), and the surrounding text/done frames are
+// byte-for-byte the IMDB-10 contract — existing consumers see nothing new.
+
+test('AC-16-sse-wire: redacted tool frame gains exactly governance.redactedFields; clean frames unchanged', async () => {
+  const redactedText = JSON.stringify({
+    data: { title: { rating: { averageRating: 8.8 } } },
+    extensions: { governance: { redactedFields: ['Rating.numVotes'], roles: [], revision: 8 } },
+  })
+  const turns = [
+    {
+      stop_reason: 'tool_use',
+      content: [
+        { type: 'tool_use', id: 't1', name: 'query-graphql', input: { query: '{ a }' } },
+        { type: 'tool_use', id: 't2', name: 'query-graphql', input: { query: '{ b }' } },
+      ],
+      usage: { input_tokens: 10, output_tokens: 5 },
+    },
+    {
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: 'done' }],
+      usage: { input_tokens: 8, output_tokens: 6 },
+    },
+  ]
+  let turn = 0
+  const anthropic = {
+    messages: {
+      stream() {
+        const message = turns[Math.min(turn, turns.length - 1)]
+        turn += 1
+        return {
+          on(event, cb) {
+            if (event === 'text' && message.stop_reason === 'end_turn') cb('All done.')
+            return this
+          },
+          async finalMessage() {
+            return message
+          },
+        }
+      },
+    },
+  }
+  const results = [redactedText, '{"data":{"title":{"primaryTitle":"Inception"}}}']
+  const createMcpSession = async () => ({
+    tools: [{ name: 'query-graphql', description: '', input_schema: { type: 'object' } }],
+    callTool: async () => ({ text: results.shift(), isError: false }),
+    close: async () => {},
+  })
+  const app = createApp({
+    verifyToken: okVerify,
+    runChat: createAgent({ anthropic, createMcpSession }),
+    rateLimiter: noLimit,
+  })
+
+  const res = await sseRequest(app, ask('how many votes does Game of Thrones have?'))
+  assert.equal(res.status, 200)
+  const events = parseSseStrict(res.body)
+
+  const toolFrames = events.filter((e) => e.event === 'tool')
+  assert.equal(toolFrames.length, 2)
+
+  // Redacted call: exactly {name, governance}, governance exactly {redactedFields}.
+  assertKeys(toolFrames[0].data, ['name', 'governance'], 'redacted tool event')
+  assert.equal(toolFrames[0].data.name, 'query-graphql')
+  assertKeys(toolFrames[0].data.governance, ['redactedFields'], 'governance payload')
+  assert.deepEqual(toolFrames[0].data.governance.redactedFields, ['Rating.numVotes'])
+  // roles/revision from the router extension never reach the transcript.
+  assert.doesNotMatch(res.body, /"roles"|"revision"/)
+
+  // Clean call: byte-identical to the IMDB-10 contract — no governance key at all.
+  assert.deepEqual(toolFrames[1].data, { name: 'query-graphql' })
+
+  // Text and done frames unchanged.
+  for (const e of events.filter((x) => x.event === 'text')) assertKeys(e.data, ['delta'], 'text event')
+  assertKeys(events.at(-1).data, ['usage'], 'done event')
+})

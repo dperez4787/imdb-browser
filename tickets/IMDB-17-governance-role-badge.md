@@ -1,12 +1,12 @@
 ---
 id: IMDB-17
 title: Governance role badge — show who the graph thinks you are
-status: ready-for-dev
+status: done
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-2, IMDB-4]
-branch: ""
-pr: ""
+branch: imdb-17-governance-role-badge
+pr: https://github.com/dperez4787/imdb-browser/pull/20
 ---
 
 ## Description
@@ -99,3 +99,89 @@ headers are the supported mechanism today.
   never a guessed state) from `[]` (header absent → no-roles state), matching the
   verified live contract. Hook named `useGovernanceRoles()` in `src/graphql/` per
   the AC. Status → **`ready-for-dev`**; `design:` set.
+- **developer** — claimed; branch `imdb-17-governance-role-badge` off `origin/main`.
+  Implemented the role signal as a module-level store
+  (`src/graphql/rolesStore.js`, `useSyncExternalStore`, mirroring
+  `searchTextStore`): `null` = no response yet (Unknown), `[]` = a response with
+  `X-Imdb-Roles` absent (no roles), otherwise the header's values in order;
+  `x-imdb-policy-revision` → `revision` (extensions fallback). The client feeds
+  it from every resolved response — the sole `client.js` touch is additive:
+  `rawExecute` now also destructures `headers` off the existing
+  `client.rawRequest(...)` and calls `ingestResponse(headers, extensions)`
+  before returning; the resolved `{ data, extensions }` shape and error
+  normalization are untouched. New `RoleBadge` (fixed 104px slot, solid pill /
+  dashed `no data role` / empty slot) mounts inside the single `UserMenu`
+  trigger left of the avatar (no new tab stop); the trigger's aria-label
+  extends with the state (` — data roles: …` / ` — no data role`, silent) and
+  the menu gains a static, non-focusable **Data roles** section with
+  `policy rev <n>`. Files: `src/graphql/rolesStore.js` (+test),
+  `src/graphql/client.js` (additive), `src/graphql/index.js` (re-export),
+  `src/RoleBadge.jsx` (+test), `src/UserMenu.jsx` (+tests), `src/styles.css`.
+  No other view touched; the roles-present *live* path is seam-tested only and
+  deferred per the user directive (the verifying identity maps to no persona).
+- **developer** — **in-review**, draft PR #20. `npm ci && npm test &&
+  npm run build` all green (359 passed, 17 skipped — the live/hermetic set).
+  Colocated tests: `rolesStore.test.js` (transitions: present / absent /
+  changing / revision / reset / plain-object headers), `RoleBadge.test.jsx`
+  (all four states incl. dashed `no data role` + `data-roles`), and
+  `UserMenu.test.jsx` additions (badge in the single trigger, accessible-name
+  suffix, and the Data roles section). **LIVE** via
+  `LIVE_ROUTER_TOKEN="$(gcloud auth print-identity-token)"`
+  (`rolesStore.live.integration.test.js`): the real client surfaced the
+  no-roles state — `X-Imdb-Roles` absent, `x-imdb-policy-revision: 8` present
+  (both CORS-exposed) — so the store landed on `roles: []`, `revision: 8` and
+  the badge renders **"no data role"** / menu **"policy rev 8"**, exactly the
+  DES-1 no-roles spec. **Not verified live:** the roles-PRESENT path — the
+  gcloud identity maps to no persona so the header is correctly omitted;
+  deferred per the user directive and left to seam tests. Draft left for the
+  tester; not marked ready.
+- **tester** — **verdict: PASS on every agent-verifiable criterion; status →
+  `done`, PR #20 lifted from draft.** Clean checkout `npm ci && npm test &&
+  npm run build`: **375 passed, 17 skipped** (the live/hermetic set), build
+  clean, exit 0. Per-criterion:
+  - **AC1 (roles from `X-Imdb-Roles`, no extra round trip)** — **pass.** The
+    developer's coverage had a gap: nothing hermetic proved client.js feeds
+    the store (only the token-gated live test exercised that wiring). Added
+    `src/graphql/client.rolesIngest.tester.test.js` (fetch-stub seam, same as
+    client.test.js): a resolved response with the header lands the store on
+    the roles in order + revision off **exactly one fetch** — nothing
+    badge-only.
+  - **AC2 (no persona → distinct no-role state)** — **pass, verified LIVE.**
+    `LIVE_ROUTER_TOKEN="$(gcloud auth print-identity-token)" npx vitest run
+    src/graphql/rolesStore.live.integration.test.js` → 1 passed: real client
+    against the real router, store landed on `roles: []`, numeric revision.
+    Independent raw check (curl, same token): HTTP 200, `X-Imdb-Roles`
+    **absent**, `x-imdb-policy-revision: 8`, both CORS-exposed via
+    `Access-Control-Expose-Headers`. The three-state honesty rule (null =
+    empty slot / [] = dashed `no data role` / list = solid pill) is asserted
+    in the developer's RoleBadge.test.jsx and rolesStore.test.js.
+  - **AC3 (roles change → next response reflects it, no reload)** — **pass at
+    the seam.** Store and badge flip on grant/re-deny across responses
+    (developer's tests + my fetch-level grant→re-deny test). The live
+    console-grant flip needs a persona grant only the user can perform —
+    **not verified live, deferred per the 2026-07-11 directive.**
+  - **AC4 (unit tests: present/absent/changing)** — **pass** (developer's
+    rolesStore.test.js covers all three plus revision fallback and reset).
+  - **AC5 (no raw headers outside `src/graphql/`)** — **pass.** Grep across
+    `src/`: zero header reads outside the layer; RoleBadge/UserMenu consume
+    only `useGovernanceRoles()`; no `fetch()`/inline queries in components.
+  - **DES-1 addendum** — **pass.** Added tester suites for the gaps:
+    `RoleBadge.slot.tester.test.jsx` (zero-layout-jump: the slot keeps the
+    single class `role-badge` across every flip; stylesheet pins
+    `width: 104px`, pill `max-width: 11ch` + ellipsis, dashed variant declares
+    no width, ≤720px hides the slot) and `UserMenu.tester.test.jsx` (exactly
+    ONE button in every badge state — no new tab stop, badge aria-hidden;
+    Data-roles section non-focusable, one menuitem; **sign-out and unmount
+    reset the store to Unknown** — no stale roles for the next sign-in).
+    Accessible-name suffix, menu section copy, `policy rev <n>`, and the
+    em-dash unknown state were already covered by the developer's tests and
+    pass.
+  - **client.js additive** — **pass.** Full pre-existing suite green
+    (client/errors/hooks/search untouched); my tests assert `execute()` still
+    resolves bare `data`, `executeWithDenials()` keeps `{ data, deniedFields }`,
+    a transport failure still normalizes to `GraphQLLayerError` and does NOT
+    move the store, and the signed-out guard sends nothing and ingests
+    nothing.
+  Deferred (needs the user, not the agents): the live roles-PRESENT badge and
+  the live console-grant flip — grant a persona to a test identity and watch
+  the pill restyle on the next fetched response.

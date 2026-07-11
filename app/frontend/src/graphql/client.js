@@ -40,6 +40,7 @@ import { GraphQLClient } from 'graphql-request';
 
 import { getIdToken } from '../auth.js';
 import { GraphQLLayerError, normalizeError, signedOutError, tokenFetchError } from './errors.js';
+import { ingestResponse as ingestGovernanceRoles } from './rolesStore.js';
 
 const DEFAULT_ROUTER_URL = 'https://cosmo-router-dkuqnmldta-uc.a.run.app/graphql';
 
@@ -74,7 +75,12 @@ async function rawExecute(document, variables) {
     const client = new GraphQLClient(routerUrl(), {
       headers: { authorization: `Bearer ${token}` },
     });
-    const { data, extensions } = await client.rawRequest(document, variables);
+    const { data, extensions, headers } = await client.rawRequest(document, variables);
+    // IMDB-17: piggyback the governance role signal (X-Imdb-Roles /
+    // x-imdb-policy-revision, CORS-exposed) off every response — the role
+    // badge issues no request of its own. Additive only: the resolved
+    // { data, extensions } shape and error normalization are unchanged.
+    ingestGovernanceRoles(headers, extensions);
     return { data, extensions };
   } catch (err) {
     throw normalizeError(err);

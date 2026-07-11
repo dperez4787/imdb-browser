@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import AssistantMessage from './AssistantMessage.jsx';
 import ChatErrorNotice from './ChatErrorNotice.jsx';
+import GovernanceBadge from './GovernanceBadge.jsx';
 import ToolIndicator from './ToolIndicator.jsx';
 import TypingIndicator from './TypingIndicator.jsx';
 import UserMessage from './UserMessage.jsx';
@@ -29,11 +30,13 @@ export default function MessageList({ messages, draft, error, onRetry }) {
   // and "text paused for a tool call".
   const showTyping = draft && (!lastPart || lastPart.type === 'tool');
 
-  // One key that changes whenever anything below could have grown.
+  // One key that changes whenever anything below could have grown — including
+  // the governance badge appearing or growing its list mid-stream.
   const contentKey = [
     messages.length,
     parts.length,
     lastPart?.type === 'text' ? lastPart.text.length : 0,
+    draft?.governance?.redactedFields?.length ?? 0,
     error ? 'error' : '',
   ].join(':');
 
@@ -69,7 +72,7 @@ export default function MessageList({ messages, draft, error, onRetry }) {
           m.role === 'user' ? (
             <UserMessage key={m.id} content={m.content} />
           ) : (
-            <AssistantMessage key={m.id} content={m.content} />
+            <AssistantMessage key={m.id} content={m.content} governance={m.governance} />
           ),
         )}
         {parts.map((part, i) =>
@@ -80,6 +83,12 @@ export default function MessageList({ messages, draft, error, onRetry }) {
           ),
         )}
         {showTyping && <TypingIndicator />}
+        {/* Governance badge: the foot of the in-flight assistant message. Text
+            streams ABOVE it (the shimmer marks where), so it stays the last
+            line; on commit AssistantMessage renders its own (DES-7 addendum). */}
+        {draft?.governance?.redactedFields?.length ? (
+          <GovernanceBadge redactedFields={draft.governance.redactedFields} />
+        ) : null}
         {error && <ChatErrorNotice error={error} onRetry={onRetry} />}
       </div>
       {showLatest && (
