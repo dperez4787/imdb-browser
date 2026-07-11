@@ -14,6 +14,7 @@ import {
   MAX_TOOL_ITERATIONS,
   SYSTEM_PROMPT,
 } from './config.js'
+import { extractRedactedFields } from './governance.js'
 import { createMcpSession as realCreateMcpSession } from './mcp.js'
 
 // Lazy default client: constructing Anthropic() throws without an API key, and
@@ -29,8 +30,8 @@ export function createAgent({ anthropic, createMcpSession = realCreateMcpSession
   // Runs one chat request. `messages` is the validated, capped history from the
   // client; `idToken` is the requester's verified Firebase ID token, forwarded
   // to the router by the MCP child; `emit(event, data)` writes SSE events
-  // (`text` {delta} and `tool` {name} — the handler owns `done`/`error`).
-  // Resolves to { usage: { input_tokens, output_tokens } }.
+  // (`text` {delta} and `tool` {name, governance?} — the handler owns
+  // `done`/`error`). Resolves to { usage: { input_tokens, output_tokens } }.
   return async function runChat({ messages, idToken, emit }) {
     const client = anthropic ?? getDefaultClient()
     const mcp = await createMcpSession({ idToken })
@@ -65,8 +66,6 @@ export function createAgent({ anthropic, createMcpSession = realCreateMcpSession
         const toolUses = message.content.filter((block) => block.type === 'tool_use')
         const results = []
         for (const toolUse of toolUses) {
-          // The UI gets the tool NAME only — never query internals.
-          emit('tool', { name: toolUse.name })
           // Logged tool calls are how the acceptance criteria verify the loop
           // ran real GraphQL; log names, never inputs (they could embed user
           // text) and never tokens.
@@ -78,6 +77,21 @@ export function createAgent({ anthropic, createMcpSession = realCreateMcpSession
           } catch (err) {
             result = { text: `Tool execution failed: ${err.message}`, isError: true }
           }
+
+          // The UI gets the tool NAME only — never query internals — plus, when
+          // the router redacted governed fields (transparent redact mode, still
+          // HTTP 200), the withheld coordinates so the chat UI can badge the
+          // restricted treatment in real time (IMDB-16 task 2). The `tool` event
+          // is emitted AFTER the call precisely so the governance signal can ride
+          // it; `governance` is omitted entirely when nothing was redacted.
+          const redactedFields = extractRedactedFields(result.text)
+          const toolEvent = { name: toolUse.name }
+          if (redactedFields.length > 0) toolEvent.governance = { redactedFields }
+          emit('tool', toolEvent)
+
+          // A redaction is a SUCCESS, not an error: is_error stays false so the
+          // model explains the restriction (per the system prompt) instead of
+          // re-querying for a value it will never get (IMDB-16 task 3).
           results.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,

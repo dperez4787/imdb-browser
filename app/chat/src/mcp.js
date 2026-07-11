@@ -27,6 +27,17 @@ function mcpGraphqlEntry() {
 
 // Pure config builder, exported for tests: the child process environment that
 // carries the endpoint and the user's forwarded token.
+//
+// GOVERNANCE GUARANTEE — DO NOT CHANGE THE Authorization HEADER TO A SERVICE
+// CREDENTIAL. The router enforces field-level policy against the *caller's*
+// identity, so the MCP child MUST authenticate to the router as the REQUESTING
+// USER: HEADERS carries `Bearer <that user's Firebase ID token>`, the exact
+// credential the browser uses. The bot therefore sees precisely what the user is
+// allowed to see and can never become a bypass channel around governance. If a
+// service/router identity were substituted here, the assistant would read
+// governed fields the user is denied — defeating the whole point of IMDB-16. A
+// regression test (governance.test.js) asserts this header is the user's token
+// and fails if it ever becomes a static or service identity; keep it green.
 export function buildMcpEnv({ idToken, endpoint = ROUTER_GRAPHQL_URL }) {
   return {
     ENDPOINT: endpoint,

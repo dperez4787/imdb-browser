@@ -75,7 +75,9 @@ export function capHistory(messages) {
  * - `messages`: the full client-held history, newest (user) message last.
  *   Capped here via capHistory before sending.
  * - `onText(delta)`  — called per `text` event, in stream order.
- * - `onTool(name)`   — called per `tool` event.
+ * - `onTool(name, governance)` — called per `tool` event; `governance` is
+ *   `{ redactedFields: string[] }` when the router redacted governed fields on
+ *   that tool call (IMDB-16), else undefined. Additive to the IMDB-10 contract.
  * - Resolves on the `done` event; rejects with ChatApiError on everything
  *   else (auth rejection, HTTP error, server `error` event, malformed or
  *   truncated stream, network failure). An abort via `signal` rejects with
@@ -140,7 +142,9 @@ export async function consumeSse(body, { onText, onTool } = {}) {
         if (typeof event.data.delta === 'string') onText?.(event.data.delta);
         return null;
       case 'tool':
-        if (typeof event.data.name === 'string') onTool?.(event.data.name);
+        // `governance` is forwarded verbatim (or undefined); useChatSession
+        // unions/dedupes redactedFields and guards its shape (IMDB-16).
+        if (typeof event.data.name === 'string') onTool?.(event.data.name, event.data.governance);
         return null;
       case 'done':
         return { done: { usage: event.data.usage } };

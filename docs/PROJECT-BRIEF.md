@@ -68,6 +68,20 @@ client-side merging needs a fallback heuristic. Design the search box as **one
 universal input** (one search box beats two radio buttons); explicit title-only /
 people-only search remains valuable for the filtered/faceted views and complements it.
 
+## Search performance guidance (server-side, measured 2026-07-11)
+
+Guidance from the federation side; the UI data path must respect it:
+
+- Every search query carries a **server-side execution ceiling (~15 s)**; pathological
+  queries fail fast instead of camping on the database.
+- **While typing**: send ONLY `titlePrefix`/`namePrefix` queries, debounced — never the
+  `$text`-backed `search` union per keystroke. Common single tokens ("Daniel") cost
+  seconds through the text index; prefixes are index-hinted + capped.
+- **On submit (Enter)**: use `search` for word/stem semantics.
+- Fetch `searchInfo` and `facets` **once on load**, not per keystroke.
+- Avoid combining several search root fields in one operation per keystroke — they run
+  concurrently but contend for the same database.
+
 ## Facets / aggregations (planned)
 
 The design principle on the backend: **never expose raw Mongo pipelines through

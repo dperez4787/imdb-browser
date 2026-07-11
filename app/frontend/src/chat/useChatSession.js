@@ -52,9 +52,16 @@ export function useChatSession() {
     // Accumulate locally (not from state) so the committed message is exactly
     // what streamed, regardless of render batching.
     const parts = [];
+    // Governance union across this exchange's tool events: one badge per
+    // message, holding the deduped, first-seen-order union of every tool call's
+    // redactedFields (DES-7 addendum, IMDB-16). Grows in place; never a second
+    // badge. Empty → no governance, no badge.
+    const governanceFields = [];
+    const governance = () =>
+      governanceFields.length ? { redactedFields: [...governanceFields] } : null;
     const publish = () => {
       if (!mountedRef.current) return;
-      setDraft({ parts: parts.map((p) => ({ ...p })) });
+      setDraft({ parts: parts.map((p) => ({ ...p })), governance: governance() });
     };
     publish();
 
@@ -68,8 +75,17 @@ export function useChatSession() {
           else parts.push({ type: 'text', text: delta });
           publish();
         },
-        onTool: (name) => {
+        onTool: (name, gov) => {
           parts.push({ type: 'tool', name });
+          // Union in any redacted coordinates the router reported on this tool
+          // call — the badge appears the moment the first non-empty one arrives.
+          if (Array.isArray(gov?.redactedFields)) {
+            for (const field of gov.redactedFields) {
+              if (typeof field === 'string' && field && !governanceFields.includes(field)) {
+                governanceFields.push(field);
+              }
+            }
+          }
           publish();
         },
       });
@@ -86,6 +102,9 @@ export function useChatSession() {
           id: nextId(),
           role: 'assistant',
           content: content || 'I could not come up with an answer — try rephrasing?',
+          // The badge persists on the committed message — the corroboration must
+          // survive scrollback after the draft's tool lines drop.
+          governance: governance(),
         },
       ]);
       setDraft(null);

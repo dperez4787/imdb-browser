@@ -136,7 +136,9 @@ describe('route table (docs/architecture.md — Frontend routing & URL scheme)',
   });
 
   it('unknown paths render the quiet not-found screen', () => {
-    renderApp(['/titles']);
+    // `/titles` is now the faceted title search (IMDB-6); use a genuinely
+    // unrouted path to exercise the not-found fallback.
+    renderApp(['/no-such-route']);
     signIn();
     expect(screen.getByRole('heading', { name: 'Nothing showing here' })).toBeVisible();
   });
