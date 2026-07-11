@@ -182,7 +182,24 @@ body {
 
 /* ---- App shell / TopBar ---------------------------------------------- */
 
+/* DES-7: the shell body is a flex row so the docked concierge panel makes the
+   content REFLOW to the remaining width — the panel never covers the view. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-shell__body {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
 .app-shell__main {
+  flex: 1;
+  min-width: 0;
   padding: 2rem 1.5rem;
 }
 
@@ -317,12 +334,418 @@ body {
   color: var(--muted);
 }
 
+/* ---- Concierge (DES-7) -------------------------------------------------- */
+
+/* TopBar toggle */
+.chat-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chat-toggle:hover,
+.chat-toggle[aria-expanded='true'] {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.chat-toggle__dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+/* Desktop ≥1080px: docked 380px column, full height under the TopBar, the
+   content reflows to the remaining width. */
+.chat-dock {
+  flex: none;
+  width: 380px;
+  border-left: 1px solid var(--hairline);
+}
+
+.chat-dock__scrim {
+  display: none;
+}
+
+.chat-panel {
+  position: sticky;
+  top: 56px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+  background: var(--surface);
+}
+
+.chat-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  padding: 0.6rem 0.75rem 0.6rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.chat-panel__title {
+  flex: 1;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.chat-panel__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chat-panel__action:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--text);
+}
+
+/* Messages */
+.chat-messages-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.chat-msg {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  font-size: 0.92rem;
+}
+
+/* User: right-aligned raised card — the guest. */
+.chat-msg--user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 0.5rem 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px 12px 4px 12px;
+  white-space: pre-wrap;
+}
+
+/* Assistant: left, no bubble — plain markdown on the surface (the room). */
+.chat-msg--assistant {
+  align-self: stretch;
+}
+
+.chat-msg--assistant > p,
+.chat-msg--assistant > ul,
+.chat-msg--assistant > ol {
+  margin: 0 0 0.6em;
+}
+
+.chat-msg--assistant > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-msg--assistant ul,
+.chat-msg--assistant ol {
+  padding-left: 1.25rem;
+}
+
+.chat-msg--assistant code {
+  padding: 0.1em 0.35em;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.chat-msg--assistant a {
+  color: var(--amber);
+}
+
+.chat-caret {
+  color: var(--amber);
+  animation: caret-blink 1s steps(2) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Tool-call indicator line ("querying the graph…"). */
+.chat-tool {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.chat-tool__spark {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: curtain-pulse 1.2s ease-in-out infinite;
+}
+
+/* Typing shimmer */
+.chat-typing {
+  display: flex;
+  gap: 5px;
+  padding: 0.25rem 0;
+}
+
+.chat-typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+.chat-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* "↓ latest" pill */
+.chat-latest {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.4);
+}
+
+/* Error / auth-rejection notice */
+.chat-error {
+  padding: 0.75rem;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--error);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 0.88rem;
+}
+
+.chat-error__headline {
+  margin: 0;
+}
+
+.chat-error__detail {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.chat-error__retry {
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chat-error__retry:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+/* Empty / first-run state */
+.chat-empty {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 1.5rem 1.25rem;
+}
+
+.chat-empty__greeting {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.chat-empty__prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-empty__prompt {
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-empty__prompt:hover {
+  border-color: var(--muted);
+}
+
+/* Composer */
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex: none;
+  padding: 0.75rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.chat-composer__input {
+  flex: 1;
+  min-height: 38px;
+  max-height: 116px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 20px;
+  resize: none;
+}
+
+.chat-composer__input:disabled {
+  opacity: 0.5;
+}
+
+.chat-composer__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: none;
+  border-radius: 10px;
+  background: var(--amber);
+  color: #0e1014;
+  cursor: pointer;
+}
+
+.chat-composer__send:disabled {
+  background: var(--card);
+  color: var(--muted);
+  cursor: default;
+}
+
+/* <1080px: same component overlays from the right behind a scrim — the
+   content underneath doesn't reflow at these widths. */
+@media (max-width: 1079px) {
+  .chat-dock {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    border-left: none;
+    z-index: 30;
+  }
+
+  .chat-dock__scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 0.55);
+  }
+
+  .chat-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 380px;
+    max-width: 100%;
+    height: auto;
+    border-left: 1px solid var(--hairline);
+    box-shadow: -12px 0 32px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* <720px: full-screen sheet. */
+@media (max-width: 719px) {
+  .chat-panel {
+    width: 100%;
+    border-left: none;
+  }
+}
+
 /* ---- Motion ------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
   .auth-curtain .wordmark,
   .signin__dots,
-  .google-btn__spinner {
+  .google-btn__spinner,
+  .chat-caret,
+  .chat-tool__spark,
+  .chat-typing span {
     animation: none;
   }
 }
@@ -739,3 +1162,108 @@ body {
 }
 
 /* ================= end IMDB-5 universal search section ================= */
+
+/* ======================================================================== */
+/* ---- RestrictedValue (IMDB-14 / DES-8) — appended section -------------- */
+/* The redaction pill for governance-denied fields. STATIC by design: the   */
+/* hatch never animates — that is the discriminator against loading         */
+/* skeletons, which shimmer. No amber in the pill (amber = focus/activity). */
+/* ======================================================================== */
+
+.restricted-value {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45em;
+  /* Occupies exactly the line box of the text it replaces: same             */
+  /* line-height, baseline-aligned, never taller.                            */
+  line-height: inherit;
+  vertical-align: baseline;
+  cursor: default;
+}
+
+.restricted-value__pill {
+  display: inline-block;
+  position: relative;
+  /* Height tracks the surrounding text's cap height (1em), sitting on the  */
+  /* baseline like a run of redacted characters would.                      */
+  height: 1em;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  /* 45° hairline stripes: 1px lines of --hairline every 3px over --card.   */
+  background: repeating-linear-gradient(
+    45deg,
+    var(--hairline) 0,
+    var(--hairline) 1px,
+    var(--card) 1px,
+    var(--card) 3px
+  );
+  /* Width comes from the inline style (default 3.5em, call-site hint).     */
+}
+
+.restricted-value__lock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+}
+
+.restricted-value--line .restricted-value__lock {
+  /* Leading in the line-level pill, centered in the inline pill. */
+  left: 0.7em;
+  transform: translate(0, -50%);
+}
+
+.restricted-value__word {
+  font-size: 11px;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+/* Visually hidden, present for screen readers:
+   "<Label>: restricted by data governance." */
+.restricted-value__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Tooltip: dark raised card, hairline border, max-width 280px, no arrow.
+   Presentation only (aria-hidden) — never traps focus or blocks neighbors. */
+.restricted-value__tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  width: max-content;
+  max-width: 280px;
+  padding: 0.5rem 0.65rem;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.restricted-value__tooltip-head {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.restricted-value__tooltip-body {
+  display: block;
+  color: var(--muted);
+}
+
+/* ---- end RestrictedValue (IMDB-14 / DES-8) ----------------------------- */

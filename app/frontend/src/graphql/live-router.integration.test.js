@@ -17,7 +17,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { execute } from './client.js';
+import { execute, executeWithDenials } from './client.js';
 import { GraphQLLayerError } from './errors.js';
 import {
   SEARCH_INFO_QUERY,
@@ -25,6 +25,29 @@ import {
   SEARCH_TITLES_QUERY,
   TITLE_QUERY,
 } from './queries.js';
+
+/**
+ * IMDB-14 live check: selects the governed `Rating.numVotes` (denied to every
+ * principal at policy revision 8) beside ungoverned siblings. Defined here,
+ * not in queries.js — production documents there stay aligned with what the
+ * views of this round actually render. Expected live behavior is the
+ * router's TRANSPARENT REDACT MODE (governance-platform notice on the
+ * ticket, verified 2026-07-11): HTTP 200, numVotes absent from data, the
+ * coordinate reported in extensions.governance.redactedFields.
+ */
+const GOVERNED_TITLE_QUERY = `
+  query GovernedTitle($tconst: ID!) {
+    title(tconst: $tconst) {
+      tconst
+      primaryTitle
+      startYear
+      rating {
+        averageRating
+        numVotes
+      }
+    }
+  }
+`;
 
 const TOKEN = process.env.LIVE_ROUTER_TOKEN;
 
@@ -81,5 +104,26 @@ describe.skipIf(!TOKEN)('live cosmo router through the real client module', () =
     globalThis.__liveToken = TOKEN;
     expect(err).toBeInstanceOf(GraphQLLayerError);
     expect(err.kind).toBe('auth');
+  }, 30000);
+
+  it('IMDB-14 governance (redact mode): selecting Rating.numVotes resolves { data, deniedFields } — ungoverned fields survive, nothing 403s', async () => {
+    globalThis.__liveToken = TOKEN;
+    const { data, deniedFields } = await executeWithDenials(GOVERNED_TITLE_QUERY, {
+      tconst: 'tt0068646',
+    });
+    // One denied field blanked nothing: every ungoverned sibling resolved…
+    expect(data.title.primaryTitle).toBe('The Godfather');
+    expect(data.title.startYear).toBe(1972);
+    expect(data.title.rating.averageRating).toBeGreaterThan(0);
+    // …the redacted coordinate is absent from data and reported to the view.
+    expect(data.title.rating).not.toHaveProperty('numVotes');
+    expect(deniedFields).toEqual(['Rating.numVotes']);
+  }, 30000);
+
+  it('IMDB-14: the redaction is a data-level signal, not an error — execute() succeeds too, with numVotes simply gone', async () => {
+    globalThis.__liveToken = TOKEN;
+    const data = await execute(GOVERNED_TITLE_QUERY, { tconst: 'tt0068646' });
+    expect(data.title.rating.averageRating).toBeGreaterThan(0);
+    expect(data.title.rating).not.toHaveProperty('numVotes');
   }, 30000);
 });

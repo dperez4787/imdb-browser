@@ -9,13 +9,17 @@
  * `offset` have schema defaults, but the hooks always send them explicitly so
  * query keys and request variables stay in lockstep.
  *
- * FIELD GOVERNANCE (router "fieldAuth" module, verified live 2026-07-10):
+ * FIELD GOVERNANCE (IMDB-14, verified live 2026-07-11, policy revision 8):
  * `Rating.numVotes`, `Name.birthYear`, and `Name.deathYear` are governed by
- * the imdb-policy-service bundle and DENIED to every Google/Firebase identity
- * (HTTP 403, code PERMISSION_DENIED, extensions.deniedFields). No document
- * here may select them until policy grants a role — see the IMDB-4 ticket Log.
- * Popularity SORTS (POPULARITY_DESC) still work server-side; only reading the
- * raw vote count is denied.
+ * the imdb-policy-service and currently denied to every identity. Since the
+ * router's transparent redact mode, documents MAY select governed fields
+ * optimistically: a denied field comes back absent from `data` (HTTP 200, no
+ * error) and reported in extensions.governance.redactedFields, which the
+ * hooks surface as `deniedFields` (see client.js). Author documents so no
+ * parent selects ONLY governed leaves (e.g. `rating` co-selects
+ * `averageRating`), so a redaction degrades a field, never an object.
+ * Popularity SORTS (POPULARITY_DESC) still work server-side; only reading
+ * the raw vote count is denied.
  *
  * Components never import this file — they use the hooks in hooks.js.
  */

@@ -12,10 +12,15 @@ export function createQueryClient() {
       queries: {
         refetchOnWindowFocus: false,
         // Retrying can only help transient failures: an expired credential
-        // ('auth') or an invalid filter ('bad-request') fails identically on
-        // every attempt, so don't burn requests on it.
+        // ('auth'), an invalid filter ('bad-request'), or a residual
+        // reject-mode governance denial ('denied' — deterministic per policy
+        // revision) fails identically on every attempt, so don't burn
+        // requests on it.
         retry: (failureCount, error) =>
-          error?.kind !== 'auth' && error?.kind !== 'bad-request' && failureCount < 2,
+          error?.kind !== 'auth' &&
+          error?.kind !== 'bad-request' &&
+          error?.kind !== 'denied' &&
+          failureCount < 2,
       },
     },
   });

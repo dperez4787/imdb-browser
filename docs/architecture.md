@@ -2,8 +2,8 @@
 
 Owned by the **architect** agent. Decisions this repo makes on top of the system
 described in `docs/PROJECT-BRIEF.md`. Every decision below states its one-sentence
-why and what was verified (repo/file or live probe) on 2026-07-10; anything not
-verifiable is marked **Assumption**.
+why and what was verified (repo/file or live probe) with its verification date;
+anything not verifiable is marked **Assumption**.
 
 ## Settled by inheritance (see CLAUDE.md / the brief)
 
@@ -99,10 +99,13 @@ buys nothing here while costing bundle size and a second mental model.
   stay in lockstep.
 - **Error normalization:** every failure surfaces as one shape —
   `{ kind: 'auth' | 'denied' | 'network' | 'graphql' | 'bad-request', message,
-  errors }` (`denied` additionally carries `deniedFields`). Any GraphQL error with
-  `extensions.code === 'PERMISSION_DENIED'` → `denied` — checked **before** the
-  HTTP-status rule, because governance denials arrive as 403 (see § Field-level
-  governance); HTTP 401/403 without that marker → `auth`; fetch/transport failure →
+  errors }` (`denied` additionally carries `deniedFields`). Governance denials are
+  normally **not errors at all** — the router redacts silently on a 200 and the
+  client derives `deniedFields` from `extensions.governance.redactedFields` (see
+  § Field-level governance); the `denied` *kind* exists as a defensive fallback:
+  any GraphQL error with `extensions.code === 'PERMISSION_DENIED'` → `denied`,
+  checked **before** the HTTP-status rule because that reject shape arrives as
+  403. HTTP 401/403 without that marker → `auth`; fetch/transport failure →
   `network`; GraphQL `errors` with `BAD_REQUEST` extensions (the orchestrator's
   validation errors — caps, exclusive fields, offset > 10000) → `bad-request`; other
   GraphQL errors → `graphql`. Views branch on `kind` only.
@@ -129,109 +132,152 @@ governance console and reach the router within one policy-poll interval — **no
 deploy, no code change**. The demo flips grants live; everything below is designed
 so the SPA reflects a flip on the next fetch.
 
-### Verified denial shape (live, 2026-07-10)
+### Verified redaction shape (live, 2026-07-11) — transparent redact mode
 
-Any operation whose selection set includes ≥ 1 denied field is rejected **whole** —
-HTTP **403**, no `data` key at all, never partial data — with one GraphQL error
-aggregating every denied coordinate in the document:
+The router's default enforcement is **transparent redact**: an operation selecting
+≥ 1 denied field returns **HTTP 200** with the denied fields **silently absent
+from `data`** — alias-aware (an aliased governed field is absent under its alias)
+and per-element in lists — and **no `errors` array at all**. The machine-readable
+signal is a top-level extension:
 
 ```json
-{"errors":[{"extensions":{"code":"PERMISSION_DENIED",
-  "deniedFields":["Name.birthYear","Name.deathYear","Rating.numVotes"]},
-  "message":"not authorized to read: Name.birthYear, Name.deathYear, Rating.numVotes"}]}
+{"data":{"title":{"primaryTitle":"Inception","rating":{"averageRating":8.8}}},
+ "extensions":{"governance":{
+   "redactedFields":["Rating.numVotes"],"roles":[],"revision":8}}}
 ```
 
-The check is static selection-set analysis, not per-row: a denied field nested
-three levels deep (`name { knownForTitles { rating { numVotes } } }`) produces the
-same 403, so a given (document, principal, bundle) triple always gets the same
-verdict. The policy bundle is readable at `GET
-https://imdb-policy-service-dkuqnmldta-uc.a.run.app/v1/bundle` (revision,
-posture, fields, principals) — useful for ops/debugging, but **the SPA never calls
-it**: the router is the SPA's only data backend, and a browser-side capability
-probe against the policy service would both break that rule and go stale
-mid-session as grants flip.
+`redactedFields` unions every denied coordinate in the document (a query touching
+`Rating.numVotes`, `Name.birthYear`, `Name.deathYear` reports all three). A parent
+whose *every* selected leaf is redacted survives as an empty object
+(`"rating": {}`), never `null`, so views need no extra null-guards. Two response
+headers accompany every graph response: `x-imdb-policy-revision` (always) and
+`X-Imdb-Roles` (only when the caller has ≥ 1 role), both listed in
+`Access-Control-Expose-Headers` so browser code may read them.
 
-### Decision — normalized kind `denied`
+The old **reject shape** — HTTP 403, no `data`, one aggregated
+`PERMISSION_DENIED` error carrying `deniedFields` (what IMDB-4 observed) — still
+exists, but only for **subscriptions** and as a router **config fallback**. The
+SPA runs no subscriptions, so in practice it should never see it; the client
+still handles it (below) because a config flip is outside this repo's control.
 
-Any GraphQL error with `extensions.code === 'PERMISSION_DENIED'` normalizes to
-`{ kind: 'denied', deniedFields, message, errors }`, with `deniedFields` unioned
-across all errors (live it is one aggregated error; the union is defensive against
-a future one-error-per-field shape). This rule runs **before** the HTTP-status
-mapping, because the denial arrives as a 403 that would otherwise become `auth`.
-Why: a signed-in user's governance denial is not a credential problem, and
-presenting it as one points users at a useless re-login. `auth` stays reserved for
-401/403 without the `PERMISSION_DENIED` marker.
+The policy bundle is readable at `GET
+https://imdb-policy-service-dkuqnmldta-uc.a.run.app/v1/bundle` (revision, posture,
+fields, principals) — useful for ops/debugging, but **the SPA never calls it**:
+the router is the SPA's only data backend, and a browser-side capability probe
+against the policy service would both break that rule and go stale mid-session as
+grants flip. There is **no `/v1/whoami` endpoint** (404, verified live) — do not
+depend on one appearing; role identity comes only from the router's response
+headers and `extensions.governance.roles`.
 
-### Decision — select/degrade: optimistic select + strip-and-retry
+### Decision — `deniedFields` from `extensions.governance`, kind `denied` as fallback
 
-Operation documents select governed fields normally. When execution comes back
-`denied`, the client strips exactly the denied coordinates from the document and
-retries **once**; the queryFn then resolves `{ data, deniedFields }` (clean
-results resolve `{ data, deniedFields: [] }`). Kind `denied` reaches a view only
-if stripping empties the whole document or the retry is denied again. Why
-optimistic instead of always-omit or a session-start capability probe: the full
-document is re-sent on every fetch, so a live grant is picked up on the very next
-fetch with zero code — always-omit needs a code change per grant, and a
+The primary path is not an error path. On any 200, the client reads
+`extensions.governance.redactedFields` (absent extension → `[]`) and the queryFn
+resolves `{ data, deniedFields }` — same resolved shape as before, new source.
+Why keep the hook-facing name `deniedFields` rather than rename to
+`redactedFields`: every design spec and view contract already binds to it, and the
+semantic ("these coordinates were withheld by governance") is unchanged.
+
+The normalized kind `denied` is **retained as a defensive fallback**: any GraphQL
+error with `extensions.code === 'PERMISSION_DENIED'` normalizes to `{ kind:
+'denied', deniedFields, message, errors }` (`deniedFields` unioned across errors),
+checked **before** the HTTP-status mapping because that shape arrives as a 403
+that would otherwise become `auth` — and a governance denial is not a credential
+problem, so it must not point users at a useless re-login. This branch fires only
+if the router is flipped back to reject mode; it costs a few lines and removes a
+whole failure class from a config change we don't control.
+
+### Decision — select/degrade: optimistic select, one round trip
+
+Operation documents select governed fields normally, always. Redact mode returns
+partial data plus the extension in the **same response**, so degrade is free:
+resolve `{ data, deniedFields }` and done. **Strip-and-retry is removed from this
+design** — an earlier revision specified stripping denied coordinates from the
+document via AST `visit` and retrying once; redact mode superseded it before it
+was implemented, and nothing of it survives (no document rewriting, no second
+request, no AST dependency).
+
+Why optimistic select still (vs. always-omit or a session-start capability
+probe): the full document is re-sent on every fetch, so a live grant is picked up
+on the very next fetch with zero code — the field simply appears in `data` and
+drops out of `redactedFields`. Always-omit needs a code change per grant; a
 capability probe adds a forbidden policy-service dependency and goes stale
-mid-session; the cost is one extra round trip per fetch only while a selected
-field is denied.
+mid-session. Under redact mode the last cost argument disappears too: a denied
+selection no longer even costs an extra round trip. **Absence + the extension is
+the signal; never derive a document from prior denials.**
 
-Mechanics the developer must keep (all inside `src/graphql/`):
+Remaining mechanics (all inside `src/graphql/`):
 
-- Strip via AST `visit` from the `graphql` package (already a dependency of
-  `graphql-request`): remove each Field node whose name equals the field part of a
-  denied coordinate, then drop any parent field left with an empty selection set,
-  recording that parent's coordinate as denied too. Name-based matching is safe
-  here because the strip only removes names the router itself just denied in this
-  exact document.
-- **Never cache the stripped document across fetches** — re-sending the optimistic
-  full document is the grant-detection mechanism.
-- `denied` is non-retryable at the TanStack layer (like `auth`/`bad-request`); the
-  strip-and-retry lives inside the queryFn, not in TanStack `retry`.
-- Author documents so no parent selects *only* governed leaves (e.g. `rating`
-  always co-selects `averageRating` beside `numVotes`), so stripping degrades a
-  field, never a whole object.
+- `denied` (the fallback kind) is non-retryable at the TanStack layer, like
+  `auth`/`bad-request` — retrying an unchanged document cannot succeed within a
+  policy revision.
+- Co-selecting an ungoverned sibling beside a governed leaf (e.g.
+  `averageRating` beside `numVotes`) is still good document style — it keeps the
+  parent object visibly meaningful — but it is no longer load-bearing: a
+  parent reduced to `{}` is handled (verified above).
 
 ### Decision — caching: denial-scoped staleTime
 
-A degraded result (`deniedFields` non-empty) gets **`staleTime` 60 seconds** via
-TanStack v5's function form
+Unchanged: a degraded result (`deniedFields` non-empty) gets **`staleTime` 60
+seconds** via TanStack v5's function form
 (`staleTime: (query) => query.state.data?.deniedFields?.length ? 60_000 : <normal>`);
-clean results keep the standard policy (1 h entities, 5 m searches). Why: this
-scopes the freshness cost to exactly the cache entries a grant flip can change —
-60 s matches the order of the router's policy-poll interval, and ungoverned
-queries pay nothing. Demo behavior this yields: **deny → grant** — the degraded
-entry goes stale within 60 s, the next mount/fetch re-sends the full document and
-renders the real value; **grant → re-deny** — the clean result ages under the
-normal staleTime, so re-denial appears on the next fetch past staleTime or on any
-page reload (the query cache is in-memory only, no persistence, so a reload is
-always a fresh fetch). Both directions satisfy "the next fresh fetch reflects it,
-no redeploy".
+clean results keep the standard policy (1 h entities, 5 m searches). Redact mode
+*strengthens* the rationale: a redaction is invisible in `data` alone (the field
+is just absent), so cache staleness is the **only** mechanism by which a grant
+flip ever becomes visible — nothing errors, nothing invalidates. 60 s matches the
+order of the router's policy-poll interval, and ungoverned queries pay nothing.
+Demo behavior: **deny → grant** — the degraded entry goes stale within 60 s, the
+next mount/fetch re-sends the full document and renders the real value;
+**grant → re-deny** — the clean result ages under the normal staleTime, so
+re-denial appears on the next fetch past staleTime or on any page reload (the
+query cache is in-memory only, no persistence, so a reload is always a fresh
+fetch). Both directions satisfy "the next fresh fetch reflects it, no redeploy".
+
+### Roles for the UI (feeds the role badge, IMDB-17)
+
+Roles derive from the policy service's **persona subjects** — a Google email
+mapped to a persona gets that persona's roles; a user mapped to no persona has
+**no roles at all** (empty `extensions.governance.roles`, no `X-Imdb-Roles`
+header). The **sanctioned sources** for displaying the caller's roles are the
+router's own responses: the `X-Imdb-Roles` header (present only when non-empty,
+CORS-exposed) and `extensions.governance.roles` on redacted responses.
+`x-imdb-policy-revision` is likewise available if the badge wants to show policy
+freshness. Do **not** call the policy service for this — and specifically, no
+`/v1/whoami` exists (verified 404); nothing in the SPA may assume it will.
 
 ### Contract for views (feeds the shared restricted-field treatment)
 
 - Every query hook exposes `deniedFields` (array of `Type.field` coordinates,
   possibly empty) alongside `data`; the plumbing lives in `src/graphql/`, and no
   component outside it parses raw GraphQL errors or `extensions`.
-- **Restricted ≠ absent.** A coordinate present in `deniedFields` was stripped by
+- **Restricted ≠ absent.** A coordinate present in `deniedFields` was withheld by
   governance → render the shared restricted treatment. A null/absent value whose
   coordinate is *not* in `deniedFields` is genuinely missing data → render the
-  empty state. These are the only two rules a view needs.
+  empty state. These are the only two rules a view needs — unchanged by the
+  redact-mode contract, which is the point: only the plumbing's *source* moved.
 - The shared restricted-value component (IMDB-14) is the single consumer-facing
   rendering of this state; feature views pass it the coordinate they wanted.
 
-### Verified vs assumed
+### Verified vs taken from the platform notice
 
-- **Verified live 2026-07-10** (Google OIDC identity token against the live
-  router): the 403/no-`data` whole-operation rejection, the aggregated
-  `PERMISSION_DENIED`/`deniedFields` error shape (single- and multi-coordinate,
-  including a nested selection), a clean query 200 alongside, and
-  `GET /v1/bundle` (rev 8, three governed coordinates, empty `principals`).
-- **Assumption:** grant-propagation latency ("within one poll interval") is the
-  user's description of the policy service, not exercised live — flipping grants
-  is user-only; the 60 s staleTime is sized to that claim.
-- **Assumption:** the single-aggregated-error shape is stable; the normalizer's
-  union across errors keeps a one-error-per-field change from breaking it.
+- **Verified live 2026-07-11** (Google OIDC identity token against the live
+  router, policy revision 8): HTTP 200 with denied fields silently absent and no
+  `errors` array; alias-awareness (`votes: numVotes` absent under its alias);
+  per-element absence across a list (`titles(tconsts: [...])`);
+  multi-coordinate union in `redactedFields` (all three governed coordinates from
+  one document); `extensions.governance` shape (`redactedFields`, `roles: []`,
+  `revision: 8`); the empty-parent `"rating": {}` shape;
+  `x-imdb-policy-revision: 8` on the response with `Access-Control-Expose-Headers:
+  X-Imdb-Roles, X-Imdb-Policy-Revision, X-Imdb-Router`; policy-service
+  `/v1/bundle` 200 and `/v1/whoami` **404**.
+- **From the governance-platform notice, not exercised live:** `X-Imdb-Roles`
+  presence when the caller *has* roles (the verifying identity maps to no
+  persona, so the header was correctly absent); the 403 reject shape's retention
+  for subscriptions and as config fallback; the email → persona → roles mapping
+  mechanics.
+- **Assumption (carried over):** grant-propagation latency ("within one poll
+  interval") is the user's description of the policy service, not exercised live —
+  flipping grants is user-only; the 60 s staleTime is sized to that claim.
 
 ## Chat backend API contract
 

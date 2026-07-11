@@ -50,17 +50,27 @@ describe('IMDB-1 scaffold conventions', () => {
     expect(existsSync(join(srcDir, 'graphql'))).toBe(true);
   });
 
-  it('confines data requests: no fetch()/XHR/GraphQL operations outside src/graphql/ (IMDB-4)', () => {
+  it('confines data requests to sanctioned boundary modules (IMDB-4, IMDB-11)', () => {
     // Exclude this checker itself (its assertion patterns mention the banned
     // strings) and the sanctioned GraphQL boundary, which since IMDB-4 is the
     // one place transport and operation documents may live.
     const self = fileURLToPath(import.meta.url);
     const graphqlBoundary = join(srcDir, 'graphql') + '/';
+    // The other sanctioned network boundary (CLAUDE.md / docs/architecture.md):
+    // src/chat/chatApi.js owns the chat-backend fetch (IMDB-11).
+    const networkBoundary = new Set([
+      join(srcDir, 'chat', 'chatApi.js'),
+      // Opt-in integration test that deliberately drives the real local
+      // chat backend (health probe) — never runs in the normal suite.
+      join(srcDir, 'chat', 'chatApi.integration.test.jsx'),
+    ]);
     for (const file of sourceFiles(srcDir).filter(
       (f) => f !== self && !f.startsWith(graphqlBoundary),
     )) {
       const code = stripComments(readFileSync(file, 'utf8'));
-      expect(code, `${file} must not call fetch()`).not.toMatch(/\bfetch\s*\(/);
+      if (!networkBoundary.has(file)) {
+        expect(code, `${file} must not call fetch()`).not.toMatch(/\bfetch\s*\(/);
+      }
       expect(code, `${file} must not use XMLHttpRequest`).not.toMatch(/XMLHttpRequest/);
       expect(code, `${file} must not contain GraphQL operations`).not.toMatch(
         /\b(?:gql`|graphql\(|query\s+\w+\s*[({]|mutation\s+\w+\s*[({])/,

@@ -3,11 +3,10 @@
  * developer's colocated suites, at the seams the acceptance criteria and the
  * live router's field-governance policy care about:
  *
- *   1. FIELD GOVERNANCE regression guard: the router's fieldAuth module
- *      (policy bundle rev 7, verified live 2026-07-10) denies
- *      `Rating.numVotes`, `Name.birthYear`, `Name.deathYear` to every
- *      identity. NO committed operation document may select them — a single
- *      denied field 403s the whole query for every user.
+ *   1. FIELD GOVERNANCE document-style guard (rewritten by IMDB-14): under
+ *      redact mode documents may select governed fields optimistically, but
+ *      a parent must never select ONLY governed leaves — see the describe
+ *      block's history note.
  *   2. Credential attach, re-proved from the raw fetch call: exact header
  *      value, POST body carries the operation, router URL is the only
  *      destination.
@@ -15,8 +14,9 @@
  *      the promise rejects kind 'auth' and fetch is NEVER invoked.
  *   4. Each normalization branch exercised THROUGH execute() (transport
  *      included), not just via normalizeError() unit calls: 401→auth,
- *      403→auth (the live PERMISSION_DENIED status), reject→network,
- *      5xx→network, BAD_REQUEST→bad-request, other→graphql.
+ *      403+PERMISSION_DENIED→denied (updated by IMDB-14; was 'auth' when
+ *      this suite was written), reject→network, 5xx→network,
+ *      BAD_REQUEST→bad-request, other→graphql.
  *   5. Query-key/variable lockstep: distinct variable sets can never collide
  *      in the cache, and builders are pure.
  */
@@ -54,11 +54,18 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('field governance: denied fields never selected (regression guard)', () => {
-  // Denied to ALL identities by the live imdb-policy-service bundle (rev 7):
-  // selecting any of these 403s the whole operation for every user.
-  const DENIED_FIELDS = ['numVotes', 'birthYear', 'deathYear'];
-
+describe('field governance: optimistic-select document style (guard updated by IMDB-14)', () => {
+  // HISTORY: under the original reject mode (policy rev 7, IMDB-4) selecting
+  // a governed field 403'd the whole operation, so this guard FORBADE
+  // numVotes/birthYear/deathYear in committed documents. The router now runs
+  // transparent redact mode (architecture § Field-level governance, verified
+  // live 2026-07-11 at rev 8): documents MAY — and per the optimistic-select
+  // policy SHOULD, where a view wants the value — select governed fields;
+  // a denial comes back as HTTP 200 with the field absent and the coordinate
+  // in extensions.governance.redactedFields. What remains mechanically
+  // checkable is the document-style rule: a parent must never select ONLY
+  // governed leaves (e.g. `rating` co-selects `averageRating` beside
+  // `numVotes`), so a redaction degrades a field, never a whole object.
   const documents = Object.entries(queries).filter(([, v]) => typeof v === 'string');
 
   it('queries.js exports operation documents to scan', () => {
@@ -67,15 +74,18 @@ describe('field governance: denied fields never selected (regression guard)', ()
     expect(documents.length).toBeGreaterThanOrEqual(7);
   });
 
-  for (const field of DENIED_FIELDS) {
-    it(`no committed operation document selects "${field}"`, () => {
-      for (const [name, doc] of documents) {
-        expect(doc, `${name} must not select governed field "${field}"`).not.toMatch(
-          new RegExp(`\\b${field}\\b`),
-        );
+  it('every `rating` selection that includes governed numVotes co-selects ungoverned averageRating', () => {
+    for (const [name, doc] of documents) {
+      for (const match of doc.matchAll(/rating\s*\{([^}]*)\}/g)) {
+        const leaves = match[1];
+        if (/\bnumVotes\b/.test(leaves)) {
+          expect(leaves, `${name}: rating{} must not select ONLY governed leaves`).toMatch(
+            /\baverageRating\b/,
+          );
+        }
       }
-    });
-  }
+    }
+  });
 });
 
 describe('credential attach (raw fetch call inspected)', () => {
@@ -143,7 +153,12 @@ describe('normalization branches through the real transport', () => {
       kind: 'auth',
     },
     {
-      name: 'HTTP 403 PERMISSION_DENIED (live fieldAuth denial status) → auth',
+      // IMDB-4 verified this arrives as HTTP 403 and (then) normalized it to
+      // 'auth'; IMDB-14 gave governance denials their own kind so a
+      // signed-in user's denial is never presented as a credential problem
+      // (architecture § Field-level governance — 'denied' BEFORE the
+      // HTTP-status rule). This case now asserts the settled contract.
+      name: 'HTTP 403 PERMISSION_DENIED (live fieldAuth denial status) → denied, never auth (IMDB-14)',
       arrange: () =>
         fetchMock.mockResolvedValue(
           graphqlResponse(
@@ -158,7 +173,7 @@ describe('normalization branches through the real transport', () => {
             { status: 403 },
           ),
         ),
-      kind: 'auth',
+      kind: 'denied',
     },
     {
       name: 'fetch rejection (offline/DNS) → network',
