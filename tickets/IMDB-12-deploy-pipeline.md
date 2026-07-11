@@ -1,7 +1,7 @@
 ---
 id: IMDB-12
 title: Deploy pipeline — Firebase Hosting + Cloud Run via OIDC/WIF
-status: backlog
+status: ready-for-dev
 owner: product-owner
 depends-on: [IMDB-1, IMDB-10]
 branch: ""
@@ -68,3 +68,4 @@ exact provisioning steps/values for the user to run, then wiring the workflow to
   (`hosting:imdb-browser`) since the project's default site belongs to
   linear-example; mirror linear-example `deploy.yml` otherwise (id-token: write,
   SHA-tagged image, pinned firebase-tools, deploy from repo root).
+- **main session** — GCP provisioning executed by the user and verified (2026-07-11): WIF provider ACTIVE, deploy/runtime SAs + roles, AR repo, ANTHROPIC_API_KEY v1, GitHub secrets re-set literal. Hosting site is `dfp-imdb-browser` (the planned id was globally reserved) — prod URL will be https://dfp-imdb-browser.web.app; deploy must target that site. Auth authorized-domain console step still pending, does not block the workflow build. Status → ready-for-dev.

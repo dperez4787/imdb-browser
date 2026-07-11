@@ -392,11 +392,13 @@ What must exist (all **user-run** — agents never execute IAM changes):
 | Runtime SA (chat) | `imdb-browser-run@…` — no project roles; resource-scoped `secretmanager.secretAccessor` on the secret |
 | Artifact Registry repo | `imdb-browser` (Docker, us-central1) |
 | Secret | `ANTHROPIC_API_KEY` — container only; version added by hand from stdin, never in code/state |
-| Firebase Hosting site | `imdb-browser` (second site in the project; deploy targets map it) |
+| Firebase Hosting site | `dfp-imdb-browser` (the id `imdb-browser` is globally reserved; second site in the project; deploy targets map it) — **provisioned 2026-07-11** |
 | Firebase Web App | new app "imdb-browser" in the same project → committed `firebase.js` config |
-| Auth authorized domain | add `imdb-browser.web.app` in Firebase Console → Auth → Settings |
+| Auth authorized domain | add `dfp-imdb-browser.web.app` in Firebase Console → Auth → Settings |
 | GitHub repo secrets | `WIF_PROVIDER` (full provider resource name), `DEPLOY_SA` |
 | Cloud Run service (CI-owned) | `imdb-browser-chat`, created by `gcloud run deploy` in deploy.yml — **not** provisioned by hand, per the cosmo-router/linear-example convention |
+
+Provisioning was **executed and verified 2026-07-11**: WIF provider ACTIVE with the repo condition, both SAs with the listed roles, AR repo `imdb-browser`, secret `ANTHROPIC_API_KEY` v1 enabled, Hosting site `dfp-imdb-browser`, GitHub secrets set (re-set with literal values). Outstanding: the Auth authorized-domain console step for `dfp-imdb-browser.web.app`.
 
 User-run commands (Owner credentials, `gcloud auth login` first):
 
@@ -438,7 +440,7 @@ gcloud secrets add-iam-policy-binding ANTHROPIC_API_KEY --project=$PROJECT \
   --role=roles/secretmanager.secretAccessor
 
 # 6. Firebase: second Hosting site + Web App (then paste the config into app/frontend/src/firebase.js)
-firebase hosting:sites:create imdb-browser --project $PROJECT
+firebase hosting:sites:create dfp-imdb-browser --project $PROJECT   # imdb-browser is globally reserved
 firebase apps:create web imdb-browser --project $PROJECT
 firebase apps:sdkconfig web <APP_ID> --project $PROJECT
 # Console (manual): Auth → Settings → Authorized domains → add imdb-browser.web.app
@@ -455,8 +457,8 @@ backend job builds `app/chat/Dockerfile` → pushes
 run deploy imdb-browser-chat --service-account imdb-browser-run@… --set-secrets
 ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest --allow-unauthenticated`; frontend job
 `npm ci && npm run build` → pinned `firebase-tools` → `firebase deploy --only
-hosting:imdb-browser` from the repo root. `firebase.json` uses a named hosting
-target (`"site": "imdb-browser"` via `.firebaserc` targets) — required because the
+hosting:dfp-imdb-browser` from the repo root. `firebase.json` uses a named hosting
+target (`"site": "dfp-imdb-browser"` via `.firebaserc` targets) — required because the
 project already serves linear-example from its default site. No `latest` tags,
 no SA keys, `firebase.json` at repo root.
 
