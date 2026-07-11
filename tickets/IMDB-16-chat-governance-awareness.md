@@ -1,12 +1,12 @@
 ---
 id: IMDB-16
 title: Chat — flag governed fields conversationally, never guess them
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-10, IMDB-11]
 branch: "imdb-16-chat-governance-awareness"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/21"
 ---
 
 ## Description
@@ -151,5 +151,6 @@ guidance it becomes the best possible explainer of governance.
   persists, zero-DOM, tooltip, SSE forwarding); `vite build` green. **Not verified:**
   the live end-to-end (real router redaction + model prose + the analyst-grant flow)
   is deferred per user directive — it needs a real `ANTHROPIC_API_KEY` and an
-  interactive Google sign-in; no key was placed anywhere. Opening a draft PR; will
-  flip to **`in-review`** with the PR link.
+  interactive Google sign-in; no key was placed anywhere. Draft PR **#21**
+  (https://github.com/dperez4787/imdb-browser/pull/21) opened; status →
+  **`in-review`**. Left as a draft for the tester (`gh pr ready` is theirs).
