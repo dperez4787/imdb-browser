@@ -1,8 +1,9 @@
 ---
 id: IMDB-17
 title: Governance role badge — show who the graph thinks you are
-status: needs-design
+status: ready-for-dev
 owner: product-owner
+design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-2, IMDB-4]
 branch: ""
 pr: ""
@@ -80,3 +81,21 @@ headers are the supported mechanism today.
   multiple roles; (4) whether the badge duplicates into the UserMenu. The
   acceptance criteria as written stand; the client-layer header plumbing mirrors
   the IMDB-14 pattern and needs no architecture pass.
+- **ui-ux-designer** — design settled: DES-1 revised in place with **"Addendum —
+  governance role badge (IMDB-17)"** (`designs/DES-1-marquee-shell-and-sign-in.md`).
+  The PO's four questions, answered there: (1) *placement* — `RoleBadge` is a 20px
+  pill inside the existing UserMenu trigger, 8px left of the 32px avatar, in a
+  **fixed 104px slot** so state changes never shift the TopBar (56px bar untouched;
+  no new tab stop); (2) *no-roles state* — dashed hairline border + muted text, copy
+  exactly **`no data role`** (not "viewer" — the spec refuses to invent a role name;
+  no lock glyph either, since DES-8's lock means a withheld value and here nothing
+  is withheld); the full "why is everything redacted" explanation lives in the menu;
+  (3) *multi-role overflow* — pill shows `first-role +N` with ellipsis past ~11ch,
+  full header-order list in the menu; (4) *UserMenu duplication* — **yes**: a static
+  "Data roles" section (roles or explanation, plus muted `policy rev <n>` from
+  `x-imdb-policy-revision`) between identity and Sign out; it is also the sole
+  surface below 720px and the keyboard/SR path (badge has no tooltip — the menu is
+  one click away). Spec distinguishes `roles: null` (no response yet → empty slot,
+  never a guessed state) from `[]` (header absent → no-roles state), matching the
+  verified live contract. Hook named `useGovernanceRoles()` in `src/graphql/` per
+  the AC. Status → **`ready-for-dev`**; `design:` set.

@@ -2,7 +2,7 @@
 id: DES-1
 title: Marquee — product concept, app shell, and sign-in
 status: approved
-tickets: [IMDB-2]
+tickets: [IMDB-2, IMDB-17]
 ---
 
 ## Intent
@@ -128,7 +128,9 @@ animation simply never becomes noticeable.
   **UserMenu** — the signed-in user's Google avatar (32px circle; if the photo URL is
   missing or fails, a monogram disc of their initials — same `Monogram` component the
   rest of the app uses). Clicking it opens a menu with display name, email (muted),
-  and **Sign out**.
+  and **Sign out**. The UserMenu trigger also carries the **governance role badge**
+  (`RoleBadge`) immediately left of the avatar — see *Addendum — governance role
+  badge* below.
 - Signing out closes the menu and returns immediately to the sign-in screen.
 - **Responsive**: below 720px the omnibox collapses to a search icon button that
   expands to a full-width overlay input on tap (DES-2 details it); wordmark collapses
@@ -172,3 +174,160 @@ animation simply never becomes noticeable.
 None from the GraphQL router — this spec deliberately requires zero router traffic.
 Firebase Auth provides `displayName`, `email`, `photoURL` for the UserMenu. Firebase
 web config is public-by-design and committed per CLAUDE.md.
+
+(The addendum below consumes response *headers* from router traffic other views
+already make; it adds no query of its own, so the zero-extra-traffic stance holds.)
+
+---
+
+## Addendum — governance role badge (IMDB-17)
+
+### Intent
+
+The graph now resolves every signed-in user to zero or more governance roles and says
+so on every response (`X-Imdb-Roles`; architecture § Field-level governance). The
+TopBar wears that answer as a small badge beside the avatar, because during a live
+grant flip the badge *is* the narration — and for a user with no roles it is the
+answer to "why is everything redacted for me" (DES-8's pills everywhere). Same
+honesty rules as the rest of Marquee: never invent a role name (no "viewer" — the
+truthful state is *no data role*), never guess before the first response (blank, not
+a claim), and never let a flip move the chrome (DES-8's zero-layout-jump discipline).
+
+### Layout
+
+```
+TopBar right cluster (≥720px):
+
+roles present:            no roles:                  unknown (pre-first-response):
+… 💬  [ANALYST](DP)       … 💬  [no data role](DP)    … 💬        (DP)
+       └ solid pill ┘            └ dashed pill ┘           └ slot empty ┘
+
+multi-role:               long role name:
+… 💬  [ANALYST +1](DP)    … 💬  [CONTENT-MODE…](DP)   ← ellipsis past ~11ch
+```
+
+- **The pill**: 20px tall, fully rounded, 11px letter-spaced small caps, vertically
+  centered in the 56px bar, 8px gap to the avatar. It renders inside the existing
+  UserMenu trigger button — the pill and the avatar are **one click target and one
+  tab stop** (the DES-1 tab order — wordmark, omnibox, chat toggle, avatar — gains
+  nothing).
+- **Roles present**: raised surface `#181b22`, 1px **solid** hairline `#262a33`,
+  primary text `#e8eaed`. One role → the role name verbatim (rendered small-caps by
+  CSS; the string is never rewritten). Two or more → first role as sent plus a count:
+  `analyst +1`. Full list lives in the menu.
+- **No roles** (a response arrived and `X-Imdb-Roles` was absent): same geometry,
+  1px **dashed** `#262a33` border, muted text `#9aa0a6`, copy exactly `no data role`.
+  The dashed border reads as "an empty slot where a role would go" — visually
+  distinct from a granted role at a glance. **No amber** (focus/activity only) and
+  **no lock glyph** — DES-8's lock means "a value exists and is withheld"; here
+  nothing is withheld, the roles list is genuinely empty.
+- **Unknown** (signed in, no router response observed yet this session): the slot
+  renders empty. Showing "no data role" before we know would be a guess.
+- **Fixed slot**: the badge renders inside a fixed-width slot (104px, constant at
+  runtime; pill right-aligned against the avatar, text ellipsized past ~11ch). Role
+  flips, first appearance, and state changes therefore never shift the chat toggle
+  or anything else — the zero-layout-jump rule, applied to chrome.
+- **Below 720px**: the slot is not rendered (the collapsed TopBar has no room); the
+  menu section below is the sole surface and keeps full parity.
+
+### In the UserMenu (yes, it duplicates — the menu is the explainer)
+
+```
+roles present:                      no roles:
+┌──────────────────────────┐       ┌──────────────────────────┐
+│ Danny Perez              │       │ Danny Perez              │
+│ perez.f@… (muted)        │       │ perez.f@… (muted)        │
+├──────────────────────────┤       ├──────────────────────────┤
+│ DATA ROLES               │       │ DATA ROLES               │
+│ analyst, public          │       │ No data role             │
+│ policy rev 12 (muted)    │       │ Governed fields are      │
+├──────────────────────────┤       │ redacted for you. A graph│
+│ Sign out                 │       │ admin can grant a role — │
+└──────────────────────────┘       │ it takes effect live, no │
+                                   │ reload. (muted)          │
+                                   │ policy rev 12 (muted)    │
+                                   ├──────────────────────────┤
+                                   │ Sign out                 │
+                                   └──────────────────────────┘
+```
+
+- A **Data roles** section sits between the identity block and Sign out: 11px
+  small-caps muted label, then the full role list (comma-separated, header order) or
+  the no-roles explanation. `policy rev <n>` (from `x-imdb-policy-revision`, muted,
+  11px) rides along — it is the honest-freshness move for governance, and during a
+  demo it visibly ticks when the bundle changes. While roles are unknown the section
+  shows `—` (an em dash) rather than hiding, so the menu never reflows on first
+  response.
+- The section is **static text, not a menu item** — not focusable, skipped by any
+  menu keyboard navigation; Sign out remains the only action. No link to the
+  governance console: it is an admin tool, not user chrome.
+- The badge itself gets **no tooltip**. Unlike DES-8's pill (a terminal affordance
+  that must self-explain), this badge is one click from its full explanation in the
+  menu; a second explaining surface would be redundant chrome.
+
+### States
+
+```
+Unknown:        empty slot; menu section shows "—". Transient — ends at the
+                first router response of the session.
+Roles present:  solid pill, name or name +N; menu lists all.
+No roles:       dashed pill, "no data role"; menu explains why everything
+                is redacted.
+Live flip:      the next router response that reports different roles
+                restyles the pill in place — no animation, no layout shift,
+                no toast, no live-region announcement (mirrors DES-8's
+                swap-in-place rule). The menu, if open, updates in place.
+Sign-out:       badge unmounts with the shell; a new sign-in starts at
+                Unknown again.
+```
+
+### Components
+
+- `RoleBadge` — the fixed-width slot + pill. Consumes `useGovernanceRoles()`;
+  renders the empty slot for `roles: null`, the dashed variant for `[]`, the solid
+  variant otherwise. Mounted inside the `UserMenu` trigger, left of the avatar.
+- `UserMenu` — grows the **Data roles** section per the wireframe (no new
+  component; it is menu content).
+- `useGovernanceRoles()` — hook exported from `src/graphql/` (per IMDB-17, no
+  component outside that module reads raw headers): returns
+  `{ roles: string[] | null, revision: number | null }` — `null` = no response
+  observed yet; `[]` = a response arrived with `X-Imdb-Roles` absent (the live
+  contract for "no roles"); otherwise the header's values in header order.
+  Updated from every router response; last response processed wins (policy flips
+  move at poll-interval scale, so ordering races are immaterial).
+
+### Behavior
+
+- The badge updates by **piggybacking on responses other views already fetch** —
+  it issues no request of its own, ever (observable: opening a page makes the same
+  router calls with and without the badge).
+- A grant flip at the governance console is reflected on the next fetched response —
+  no reload, no redeploy (observable: flip a persona, navigate or refetch, the pill
+  restyles).
+- The UserMenu trigger's accessible name extends with the badge state:
+  `"<displayName> — data roles: analyst, public"` / `"<displayName> — no data
+  role"` / just the name while unknown. It updates silently — **no `aria-live`**,
+  consistent with DES-8's no-announcement stance; a screen reader user finds the
+  current state on the trigger or in the menu.
+- Pill text and hatch-free styling are presentation; the pill carries
+  `data-roles="analyst,public"` (or `data-roles=""` for none) for tests.
+- Keyboard: unchanged from the base spec — the trigger opens on Enter/Space, the
+  menu traps focus, Esc returns focus to the trigger. The badge adds no tab stop
+  and is not independently interactive.
+- Zero layout jump, restated as the acceptance-quotable rule: **the TopBar's
+  height, the slot's width, and the position of every other TopBar element are
+  identical in all four badge states and across any live flip.**
+
+### Data needs
+
+None from the GraphQL document layer — this is transport metadata:
+
+- `X-Imdb-Roles` response header — **absent when the caller has no roles** (not
+  empty; verified live per IMDB-17's Log), comma-separated role names otherwise.
+- `x-imdb-policy-revision` response header — present on every response.
+- Both are CORS-exposed via `Access-Control-Expose-Headers` (verified live), so the
+  browser client can read them. `extensions.governance.roles` (present on redacted
+  responses) may corroborate but headers are the mechanism — they arrive on clean
+  responses too.
+- The sign-in screen's zero-traffic rule is untouched: the badge exists only inside
+  the signed-in shell and only reads headers from queries views already make.
