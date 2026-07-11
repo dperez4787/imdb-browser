@@ -1,12 +1,12 @@
 ---
 id: IMDB-6
 title: Faceted title search view
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-3-faceted-title-search.md
 depends-on: [IMDB-4]
 branch: imdb-6-faceted-title-search
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/22"
 ---
 
 ## Description
@@ -97,3 +97,28 @@ image-missing / error states.
   `averageRating` survives — numVotes stays optimistically selected. `votesFrom` is a
   filter *input* and is NOT governed (accepted, no denial) — nothing to flag on
   IMDB-14.
+- **developer** — implemented → `in-review`, PR #22 (draft).
+  What changed: `src/titles/` (TitleSearchView, FilterRail, FacetGroup,
+  YearRangeInput, RatingMinSelect, PeopleFilter, ActiveFilterChips, SortSelect,
+  ResultsGrid, TitleCard, Paginator, urlState.js + tests), new
+  `src/graphql/titleSearchQueries.js` + `src/graphql/useTitleSearch.js` (+ test)
+  — shared graphql files untouched per the round's file partition; `/titles`
+  route added to App.jsx (two-line diff); IMDB-6 styles appended to styles.css.
+  urlState.js owns the whole URL⇄filter⇄variables mapping (decided encoding:
+  comma multi-values, defaults omitted, 1-based page, size 24, offset ≤ 10k →
+  Next disabled at page 417); uncontrolled params round-trip as chips.
+  Verified: `npm ci && npm test` green (378 pass; 16 pre-existing skips are the
+  live tester suites) and `npm run build` green. LIVE against the router
+  (gcloud identity token, the real shipping document + real urlState mapping):
+  filtered deep link → total 219/uncapped, contextual counts re-count within
+  the filter, two runs of the same URL return identical item order, page 1 ∩
+  page 2 empty, numVotes redacted with averageRating intact; capped shape
+  (total 10000/totalIsCapped true) verified separately.
+  Honest gaps: (1) browser click-through as a signed-in Google user NOT done —
+  deferred per user directive; live checks used a Google OIDC token, not a
+  Firebase ID token from the UI. (2) DES-3's sub-960px filter DRAWER
+  (`Filters (3)` button, focus trap, Esc) is not implemented — below 960px the
+  rail stacks above the grid, fully interactive; designer/PO should say
+  whether the drawer is a must for this ticket or a follow-up. (3) People
+  autocomplete exercised at unit level only. (4) App.test.jsx's not-found case
+  moved to a genuinely unrouted path since `/titles` is now real.
