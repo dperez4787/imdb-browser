@@ -6,18 +6,38 @@
  * (docs/architecture.md, "GraphQL client layer"):
  *
  *   {
- *     kind:    'auth' | 'network' | 'graphql' | 'bad-request',
+ *     kind:    'auth' | 'denied' | 'network' | 'graphql' | 'bad-request',
  *     message: string,          // human-readable summary (first server message)
  *     errors:  Array<object>,   // raw GraphQL errors when present, else []
+ *     deniedFields: string[],   // 'denied' only: Type.field coordinates
  *   }
  *
- * Mapping:
+ * Mapping — ORDER MATTERS for the first two rows (IMDB-14):
+ *   - any GraphQL error with extensions.code
+ *     PERMISSION_DENIED (field-level governance;
+ *     arrives as HTTP 403 — see below)           → 'denied'
  *   - no signed-in user, HTTP 401/403            → 'auth'
  *   - fetch/transport failure, non-GraphQL HTTP  → 'network'
  *   - GraphQL errors with a BAD_REQUEST code
  *     (the orchestrator's validation errors:
  *     caps, exclusive fields, offset > 10000)    → 'bad-request'
  *   - any other GraphQL errors                   → 'graphql'
+ *
+ * GOVERNANCE DENIALS — a DEFENSIVE branch since the router's switch to
+ * transparent redact mode (governance-platform notice on the IMDB-14 ticket,
+ * verified live 2026-07-11): queries selecting a denied field now succeed
+ * with HTTP 200, the field absent from `data` and the signal in
+ * `extensions.governance.redactedFields` (handled in client.js, never here).
+ * The platform keeps the old REJECT shape for subscriptions and as a config
+ * fallback: whole-operation HTTP 403, no `data`, one GraphQL error carrying
+ * extensions.code=PERMISSION_DENIED and extensions.deniedFields=["Type.field",
+ * …] (the shape IMDB-4 verified live 2026-07-10). If it ever reaches the
+ * browser, that 403 would hit the HTTP-status rule and read as a credential
+ * problem — pointing a signed-in user at a useless re-login — so the
+ * PERMISSION_DENIED check runs FIRST. `deniedFields` is unioned across all
+ * errors: observed as one aggregated error, but the union is defensive
+ * against a one-error-per-field shape. `auth` stays reserved for 401/403
+ * WITHOUT the PERMISSION_DENIED marker.
  *
  * Views branch on `kind` only — never on HTTP status or SDK error classes.
  *
@@ -31,24 +51,42 @@
  * change here, and the nested (useful) message is surfaced either way.
  */
 
-export const ERROR_KINDS = Object.freeze(['auth', 'network', 'graphql', 'bad-request']);
+export const ERROR_KINDS = Object.freeze(['auth', 'denied', 'network', 'graphql', 'bad-request']);
 
 /**
  * The one error type this module throws. A real Error (stack, message) whose
- * `kind` and `errors` properties complete the documented shape.
+ * `kind`, `errors`, and `deniedFields` properties complete the documented
+ * shape. `deniedFields` is only populated for kind 'denied'; it is always an
+ * array so callers never null-check it.
  */
 export class GraphQLLayerError extends Error {
-  constructor(kind, message, errors = []) {
+  constructor(kind, message, errors = [], deniedFields = []) {
     super(message);
     this.name = 'GraphQLLayerError';
     this.kind = kind;
     this.errors = errors;
+    this.deniedFields = deniedFields;
   }
 }
 
 /** The signed-out guard error: thrown before any network request is made. */
 export function signedOutError() {
   return new GraphQLLayerError('auth', 'Not signed in — no request was sent to the router.');
+}
+
+/**
+ * A rejected credential fetch (auth.js#getIdToken() threw — e.g. Firebase
+ * token refresh failed). Like the signed-out guard, this happens BEFORE any
+ * network request to the router, and it is a credential problem, not a router
+ * transport one — so it is kind 'auth', never 'network', and never a raw
+ * exception escaping the client layer's normalized shape.
+ */
+export function tokenFetchError(err) {
+  const cause = err?.message ? `: ${err.message}` : '.';
+  return new GraphQLLayerError(
+    'auth',
+    `Could not obtain a sign-in credential — no request was sent to the router${cause}`,
+  );
 }
 
 /**
@@ -63,6 +101,11 @@ export function normalizeError(err) {
   // structurally (status + optional errors) so tests can fake the transport.
   const response = err?.response;
   if (response && typeof response.status === 'number') {
+    // Field-level governance FIRST (before the HTTP-status rule): the router
+    // delivers PERMISSION_DENIED as a 403, which must never read as 'auth'.
+    const denied = collectDenied(response.errors ?? []);
+    if (denied) return denied;
+
     if (response.status === 401 || response.status === 403) {
       return new GraphQLLayerError(
         'auth',
@@ -101,5 +144,25 @@ export function normalizeError(err) {
   return new GraphQLLayerError(
     'network',
     err?.message ? `Could not reach the router: ${err.message}` : 'Could not reach the router.',
+  );
+}
+
+/**
+ * Build the 'denied' error if any GraphQL error (top level or nested under
+ * the router's extensions.errors wrapper) carries PERMISSION_DENIED; else
+ * null. `deniedFields` is the deduplicated union across ALL matching errors —
+ * live the router sends one aggregated error, so the union is defensive.
+ */
+function collectDenied(gqlErrors) {
+  const flattened = gqlErrors.flatMap((e) => [e, ...(e?.extensions?.errors ?? [])]);
+  const matches = flattened.filter((e) => e?.extensions?.code === 'PERMISSION_DENIED');
+  if (matches.length === 0) return null;
+
+  const deniedFields = [...new Set(matches.flatMap((e) => e.extensions?.deniedFields ?? []))];
+  return new GraphQLLayerError(
+    'denied',
+    matches[0].message ?? 'Field-level governance denied part of this query.',
+    gqlErrors,
+    deniedFields,
   );
 }
