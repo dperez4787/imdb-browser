@@ -1,8 +1,9 @@
 /**
  * Mechanically-checkable conventions from CLAUDE.md — ES modules, Node LTS
- * pin, the sanctioned `src/graphql/` boundary, no fetch()/XHR/GraphQL in
- * source (until IMDB-4's client module), and — since IMDB-2 — Firebase
- * confined to the auth boundary (`auth.js` + `firebase.js`), nowhere else.
+ * pin, the sanctioned `src/graphql/` boundary, no fetch()/XHR/GraphQL outside
+ * that boundary (its exemption landed with IMDB-4's client module), and —
+ * since IMDB-2 — Firebase confined to the auth boundary (`auth.js` +
+ * `firebase.js`), nowhere else.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -49,19 +50,23 @@ describe('IMDB-1 scaffold conventions', () => {
     expect(existsSync(join(srcDir, 'graphql'))).toBe(true);
   });
 
-  it('makes no data requests outside sanctioned boundary modules', () => {
-    // Exclude this checker itself: its assertion patterns mention the banned strings.
+  it('confines data requests to sanctioned boundary modules (IMDB-4, IMDB-11)', () => {
+    // Exclude this checker itself (its assertion patterns mention the banned
+    // strings) and the sanctioned GraphQL boundary, which since IMDB-4 is the
+    // one place transport and operation documents may live.
     const self = fileURLToPath(import.meta.url);
-    // The sanctioned network boundaries (CLAUDE.md / docs/architecture.md):
-    // src/chat/chatApi.js owns the chat-backend fetch (IMDB-11); IMDB-4's
-    // GraphQL client will own src/graphql/. Components never fetch.
+    const graphqlBoundary = join(srcDir, 'graphql') + '/';
+    // The other sanctioned network boundary (CLAUDE.md / docs/architecture.md):
+    // src/chat/chatApi.js owns the chat-backend fetch (IMDB-11).
     const networkBoundary = new Set([
       join(srcDir, 'chat', 'chatApi.js'),
       // Opt-in integration test that deliberately drives the real local
       // chat backend (health probe) — never runs in the normal suite.
       join(srcDir, 'chat', 'chatApi.integration.test.jsx'),
     ]);
-    for (const file of sourceFiles(srcDir).filter((f) => f !== self)) {
+    for (const file of sourceFiles(srcDir).filter(
+      (f) => f !== self && !f.startsWith(graphqlBoundary),
+    )) {
       const code = stripComments(readFileSync(file, 'utf8'));
       if (!networkBoundary.has(file)) {
         expect(code, `${file} must not call fetch()`).not.toMatch(/\bfetch\s*\(/);

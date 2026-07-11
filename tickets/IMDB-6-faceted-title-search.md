@@ -74,3 +74,13 @@ image-missing / error states.
   `null` until the user runs imdb-federation's rebuild — a verified prerequisite for
   demoing this view). Spec `approved`; both blockers cleared → `ready-for-dev`
   (depends-on IMDB-4 still orders the work).
+- **product-owner** — governance advisory (no AC/status change; see IMDB-14 and
+  IMDB-4's Log/PR #8): the router now denies `Rating.numVotes` to everyone, and
+  **selecting a denied field 403s the whole operation** — so this ticket's
+  `searchTitles` document must not select it (DES-3's query snippet, which predates
+  governance and still selects `numVotes`, is being trimmed under IMDB-14's design
+  pass). Card anatomy shows the star rating (`averageRating`, ungoverned), so no AC
+  is affected. The `votesFrom` URL filter is a filter *input*, not a field
+  selection — presumed ungoverned, but the developer should verify it against the
+  live router at implementation and flag IMDB-14 if filtering is also governed.
+  Stays `ready-for-dev` with no new dependency.

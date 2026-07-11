@@ -53,13 +53,29 @@ changing this page's layout** — the header reserves one square visual slot eit
 ```
 
 - Header: `PersonVisual` slot (square, 160px; in this ticket it renders the
-  `Monogram` disc), name (h1), lifespan line (`1940 –` living, `1940 – 2015` dead,
-  absent if no birth year), professions muted (max 3).
+  `Monogram` disc), name (h1), lifespan line, professions muted (max 3).
+- **Lifespan line** — `Name.birthYear` and `Name.deathYear` are **governed slots**
+  (both currently denied to everyone), so the line has two families of state that
+  must never look alike (DES-8's two-rule contract):
+  - *Values known, nothing denied* (unchanged): `1940 –` living, `1940 – 2015`
+    dead; **no recorded birth year and nothing denied → line absent** (ordinary
+    missing data — renders nothing).
+  - *Any lifespan coordinate in `deniedFields` → the line always renders*, with
+    each denied year slot showing the inline `RestrictedValue` pill (DES-8, width
+    hint `2.5em`, labels "Birth year" / "Death year"): birth denied →
+    `▨▨🔒▨▨ – 2015`; death denied → `1940 – ▨▨🔒▨▨` (living vs. dead is unknowable
+    while denied — the redaction says exactly that); **both denied → the
+    line-level variant**, one pill + small-caps `RESTRICTED` word, label
+    "Lifespan". A year that is genuinely absent while the other is denied follows
+    its ordinary missing rule within the line.
 - **Known for**: horizontal strip of up to 4 `TitleCard`s (same card as DES-3:
   poster 2:3 ~120px wide, title one line ellipsized, `year ★rating`). Sourced from
-  the person's known-for field; if the API exposes no known-for field, the strip
-  falls back to the 4 filmography titles with the highest `numVotes`. If fewer than
-  2 candidates exist, the section doesn't render (a one-poster "strip" looks broken).
+  `Name.knownForTitles` (≤4 hydrated titles, dataset order — live-verified for
+  DES-6, see architecture § Person visuals), rendered in that order. **The strip
+  never reads `numVotes`** — the old top-4-by-`numVotes` filmography fallback is
+  retired (its trigger, "no known-for field", is disproven, and its ranking field
+  is governed). If fewer than 2 known-for titles exist, the section doesn't render
+  (a one-poster "strip" looks broken).
 - **Filmography**: one group per credit category the person has (ACTOR, DIRECTOR,
   WRITER, … — headers from the data, never hard-coded), acting categories first,
   then remaining categories in API order; rows within a group sorted by year
@@ -92,12 +108,31 @@ Poster missing:     Any thumb/card falls back to FallbackArt
 Empty filmography:  A single muted line under the header:
                     “No credited titles in the index.”
                     Known-for strip absent.
+
+Restricted lifespan (the live default today — both years denied):
+   ┌─────────┐   Al Pacino
+   │  (AP)   │   ▨▨▨🔒▨▨▨ RESTRICTED   ← line-level RestrictedValue
+   │ monogram│   Actor · Producer · Director        (DES-8)
+   └─────────┘
+                    One year denied: that slot alone shows the
+                    inline pill (▨▨🔒▨▨ – 2015 / 1940 – ▨▨🔒▨▨).
+                    Page otherwise identical to the happy path.
+                    Distinct by construction from “no recorded
+                    birth year” (line absent entirely). A grant
+                    flip swaps pill ↔ year in place on the next
+                    fresh fetch — the line renders in both states,
+                    zero layout jump (sole edge: a grant revealing
+                    a genuinely absent birth year collapses the
+                    line per the ordinary missing rule — DES-8).
 ```
 
 ## Components
 
 - `PersonDetailPage` — route component; query + loading/not-found/error/page switch.
-- `PersonHeader` — `PersonVisual` slot + name + lifespan + professions.
+- `PersonHeader` — `PersonVisual` slot + name + lifespan + professions. Consumes
+  the hook's `deniedFields` via `isRestricted(…)` for `Name.birthYear` /
+  `Name.deathYear` and renders `RestrictedValue` (DES-8) per the lifespan rules
+  above.
 - `PersonVisual` — the square identity slot; v1 renders `Monogram` (DES-1) at 160px;
   DES-6 upgrades its internals without changing its box.
 - `KnownForStrip` — up to 4 `TitleCard`s (component shared with DES-3).
@@ -118,27 +153,29 @@ Empty filmography:  A single muted line under the header:
   header visual in this ticket (Monogram is generated).
 - Keyboard: visual slot is not focusable (decorative, `aria-hidden`); focus order is
   name → known-for cards → filmography rows; all links Tab-reachable, Enter-activated.
+  When the lifespan is restricted, its `RestrictedValue` pill(s) sit between name and
+  known-for cards in the tab order (focus opens the tooltip, Esc closes — DES-8).
 - Long filmographies render fully; no pagination.
 - Scroll resets to top on navigation here.
 
 ## Data needs
 
 Field names introspection-verified; the `Name` entity hydrates through federation so
-any field is selectable — **which of these fields exist is exactly what the architect
-is verifying for DES-6/IMDB-9**, and this page is designed to work with either
-outcome:
+any field is selectable. `knownForTitles` is live-verified (architecture § Person
+visuals — ≤4 hydrated titles in the same query, zero extra GraphQL cost):
 
 ```graphql
 query PersonDetail($id: ID!) {
   name(id: $id) {                 # exact root field per introspection
     id
     primaryName
-    birthYear
-    deathYear
+    birthYear                     # GOVERNED — selected optimistically, see below
+    deathYear                     # GOVERNED — selected optimistically, see below
     primaryProfession
-    knownFor {                    # ASSUMPTION A: known-for title stubs exposed
-      id primaryTitle startYear rating { averageRating numVotes }
-    }
+    knownForTitles {              # VERIFIED (retires former Assumption A / knownFor)
+      tconst primaryTitle startYear rating { averageRating numVotes }
+    }                             # strip renders in dataset order; numVotes is for
+                                  # DES-6's card pick only, never read by this page
     credits {                     # ASSUMPTION B: filmography with categories
       category
       characters                  # when present
@@ -148,12 +185,25 @@ query PersonDetail($id: ID!) {
 }
 ```
 
-- **Assumption A** (`knownFor` as hydrated Title stubs — IMDb datasets carry
-  `knownForTitles` tconsts, so some form should exist): if absent, `KnownForStrip`
-  derives from top-4 filmography by `numVotes` as specified above — no design change.
+- **Governance (architecture § Field-level governance):** `Name.birthYear`,
+  `Name.deathYear`, and `Rating.numVotes` are governed and currently denied to
+  everyone. The query **keeps selecting them optimistically** — the client strips
+  denied coordinates and retries, the hook returns `deniedFields` alongside `data`,
+  and a live grant appears on the next fresh fetch with no code change. Co-select
+  rule satisfied: the governed leaves sit beside ungoverned siblings (`primaryName`
+  etc.; `averageRating` beside `numVotes`), so a strip never empties an object.
+  **Nothing this page renders depends on a governed field**: the lifespan slots
+  show DES-8's treatment under denial, the known-for strip uses dataset order, and
+  the ★ ratings shown everywhere read `averageRating` (ungoverned).
+- **Former Assumption A is retired**: `knownForTitles` exists and hydrates (verified
+  live); the top-4-by-`numVotes` filmography fallback is deleted rather than kept —
+  its ranking field is governed and its trigger condition is disproven.
 - **Assumption B** (a credits/filmography connection from Name to Title with
   `category` and optional `characters`): this one is **load-bearing** — the page has
   no filmography without it. It is the reverse edge of DES-4's title credits, which
   the brief's "people ↔ titles cross-navigation is cheap through federation" promise
   implies; confirm the actual field in `docs/architecture.md` / `API-CHANGES.md`.
 - Not-found vs error must be distinguishable (null vs GraphQL error), as in DES-4.
+  A governance denial is neither: the strip-and-retry means the page renders with
+  `deniedFields` set — kind `denied` reaches this page only if a retry is denied
+  again, which renders the shared error state.

@@ -98,11 +98,14 @@ buys nothing here while costing bundle size and a second mental model.
   (e.g. `['searchTitles', filter, sort, page]`) so shareable URLs and cache entries
   stay in lockstep.
 - **Error normalization:** every failure surfaces as one shape —
-  `{ kind: 'auth' | 'network' | 'graphql' | 'bad-request', message, errors }`.
-  HTTP 401/403 → `auth`; fetch/transport failure → `network`; GraphQL `errors` with
-  `BAD_REQUEST` extensions (the orchestrator's validation errors — caps, exclusive
-  fields, offset > 10000) → `bad-request`; other GraphQL errors → `graphql`. Views
-  branch on `kind` only.
+  `{ kind: 'auth' | 'denied' | 'network' | 'graphql' | 'bad-request', message,
+  errors }` (`denied` additionally carries `deniedFields`). Any GraphQL error with
+  `extensions.code === 'PERMISSION_DENIED'` → `denied` — checked **before** the
+  HTTP-status rule, because governance denials arrive as 403 (see § Field-level
+  governance); HTTP 401/403 without that marker → `auth`; fetch/transport failure →
+  `network`; GraphQL `errors` with `BAD_REQUEST` extensions (the orchestrator's
+  validation errors — caps, exclusive fields, offset > 10000) → `bad-request`; other
+  GraphQL errors → `graphql`. Views branch on `kind` only.
 
 Verified: `searchTitles` / `searchNames` / `search` / `facets` / `searchInfo`
 signatures and validation semantics in
@@ -110,12 +113,125 @@ signatures and validation semantics in
 and `imdb-federation/API-CHANGES.md` (which has landed and is authoritative); entity
 hydration exercised live through the router.
 
-> **Operational caveat (verified live):** the search collections have never been
-> rebuilt — `searchInfo.rebuiltAt` is `null`, `searchTitles` returns `total: 0`, and
-> `facets.genres` is empty, while entity queries (`title`, `name`) return full data.
-> The **user must run `./scripts/rebuild.sh` in imdb-federation** (IAM-protected,
-> ~1 hour) before any search/facet feature can be demoed or tested. Cross-repo,
-> user-run prerequisite for IMDB-5/6/7/8/13 verification.
+> **Freshness (verified live 2026-07-10):** the search index has been rebuilt —
+> `searchInfo.rebuiltAt` is `2026-07-11T03:12:24.167Z` (12,629,478 titles /
+> 15,475,639 names) — so search, facets, and entity queries all serve real data.
+
+## Field-level governance (denied fields)
+
+The router enforces field-level policy from the **"IMDb Graph Governance"** service
+(`imdb-policy-service` on Cloud Run). Governed coordinates at verification time
+(policy bundle **rev 8** — the briefing said rev 7; revisions move at runtime, so
+nothing below pins one): `Rating.numVotes` and `Name.birthYear` (role `analyst`
+only, `principals` map empty → denied to everyone), `Name.deathYear` (no roles →
+denied to all). Default posture is `allow-unless-governed`; grants flip at the
+governance console and reach the router within one policy-poll interval — **no
+deploy, no code change**. The demo flips grants live; everything below is designed
+so the SPA reflects a flip on the next fetch.
+
+### Verified denial shape (live, 2026-07-10)
+
+Any operation whose selection set includes ≥ 1 denied field is rejected **whole** —
+HTTP **403**, no `data` key at all, never partial data — with one GraphQL error
+aggregating every denied coordinate in the document:
+
+```json
+{"errors":[{"extensions":{"code":"PERMISSION_DENIED",
+  "deniedFields":["Name.birthYear","Name.deathYear","Rating.numVotes"]},
+  "message":"not authorized to read: Name.birthYear, Name.deathYear, Rating.numVotes"}]}
+```
+
+The check is static selection-set analysis, not per-row: a denied field nested
+three levels deep (`name { knownForTitles { rating { numVotes } } }`) produces the
+same 403, so a given (document, principal, bundle) triple always gets the same
+verdict. The policy bundle is readable at `GET
+https://imdb-policy-service-dkuqnmldta-uc.a.run.app/v1/bundle` (revision,
+posture, fields, principals) — useful for ops/debugging, but **the SPA never calls
+it**: the router is the SPA's only data backend, and a browser-side capability
+probe against the policy service would both break that rule and go stale
+mid-session as grants flip.
+
+### Decision — normalized kind `denied`
+
+Any GraphQL error with `extensions.code === 'PERMISSION_DENIED'` normalizes to
+`{ kind: 'denied', deniedFields, message, errors }`, with `deniedFields` unioned
+across all errors (live it is one aggregated error; the union is defensive against
+a future one-error-per-field shape). This rule runs **before** the HTTP-status
+mapping, because the denial arrives as a 403 that would otherwise become `auth`.
+Why: a signed-in user's governance denial is not a credential problem, and
+presenting it as one points users at a useless re-login. `auth` stays reserved for
+401/403 without the `PERMISSION_DENIED` marker.
+
+### Decision — select/degrade: optimistic select + strip-and-retry
+
+Operation documents select governed fields normally. When execution comes back
+`denied`, the client strips exactly the denied coordinates from the document and
+retries **once**; the queryFn then resolves `{ data, deniedFields }` (clean
+results resolve `{ data, deniedFields: [] }`). Kind `denied` reaches a view only
+if stripping empties the whole document or the retry is denied again. Why
+optimistic instead of always-omit or a session-start capability probe: the full
+document is re-sent on every fetch, so a live grant is picked up on the very next
+fetch with zero code — always-omit needs a code change per grant, and a
+capability probe adds a forbidden policy-service dependency and goes stale
+mid-session; the cost is one extra round trip per fetch only while a selected
+field is denied.
+
+Mechanics the developer must keep (all inside `src/graphql/`):
+
+- Strip via AST `visit` from the `graphql` package (already a dependency of
+  `graphql-request`): remove each Field node whose name equals the field part of a
+  denied coordinate, then drop any parent field left with an empty selection set,
+  recording that parent's coordinate as denied too. Name-based matching is safe
+  here because the strip only removes names the router itself just denied in this
+  exact document.
+- **Never cache the stripped document across fetches** — re-sending the optimistic
+  full document is the grant-detection mechanism.
+- `denied` is non-retryable at the TanStack layer (like `auth`/`bad-request`); the
+  strip-and-retry lives inside the queryFn, not in TanStack `retry`.
+- Author documents so no parent selects *only* governed leaves (e.g. `rating`
+  always co-selects `averageRating` beside `numVotes`), so stripping degrades a
+  field, never a whole object.
+
+### Decision — caching: denial-scoped staleTime
+
+A degraded result (`deniedFields` non-empty) gets **`staleTime` 60 seconds** via
+TanStack v5's function form
+(`staleTime: (query) => query.state.data?.deniedFields?.length ? 60_000 : <normal>`);
+clean results keep the standard policy (1 h entities, 5 m searches). Why: this
+scopes the freshness cost to exactly the cache entries a grant flip can change —
+60 s matches the order of the router's policy-poll interval, and ungoverned
+queries pay nothing. Demo behavior this yields: **deny → grant** — the degraded
+entry goes stale within 60 s, the next mount/fetch re-sends the full document and
+renders the real value; **grant → re-deny** — the clean result ages under the
+normal staleTime, so re-denial appears on the next fetch past staleTime or on any
+page reload (the query cache is in-memory only, no persistence, so a reload is
+always a fresh fetch). Both directions satisfy "the next fresh fetch reflects it,
+no redeploy".
+
+### Contract for views (feeds the shared restricted-field treatment)
+
+- Every query hook exposes `deniedFields` (array of `Type.field` coordinates,
+  possibly empty) alongside `data`; the plumbing lives in `src/graphql/`, and no
+  component outside it parses raw GraphQL errors or `extensions`.
+- **Restricted ≠ absent.** A coordinate present in `deniedFields` was stripped by
+  governance → render the shared restricted treatment. A null/absent value whose
+  coordinate is *not* in `deniedFields` is genuinely missing data → render the
+  empty state. These are the only two rules a view needs.
+- The shared restricted-value component (IMDB-14) is the single consumer-facing
+  rendering of this state; feature views pass it the coordinate they wanted.
+
+### Verified vs assumed
+
+- **Verified live 2026-07-10** (Google OIDC identity token against the live
+  router): the 403/no-`data` whole-operation rejection, the aggregated
+  `PERMISSION_DENIED`/`deniedFields` error shape (single- and multi-coordinate,
+  including a nested selection), a clean query 200 alongside, and
+  `GET /v1/bundle` (rev 8, three governed coordinates, empty `principals`).
+- **Assumption:** grant-propagation latency ("within one poll interval") is the
+  user's description of the policy service, not exercised live — flipping grants
+  is user-only; the 60 s staleTime is sized to that claim.
+- **Assumption:** the single-aggregated-error shape is stable; the normalizer's
+  union across errors keeps a one-error-per-field change from breaking it.
 
 ## Chat backend API contract
 
@@ -331,7 +447,11 @@ OMDb request budget (constraint for the design):
 
 - **Person card in any list (search results, cast strips): ≤ 1 poster request** —
   the single most-voted known-for title (client-side max over `rating.numVotes`,
-  which the same query already fetched).
+  which the same query already fetched). **Governance caveat:** `Rating.numVotes`
+  is a governed field currently denied to everyone (see § Field-level governance);
+  while denied, the poster pick falls back to the **first `knownForTitles` entry**
+  (dataset order) — the restricted treatment applies only where a vote count would
+  be *displayed*, never to the poster heuristic, which degrades silently.
 - **Person detail header: ≤ 4 poster requests** (the full known-for set, e.g. a
   mosaic) — only if the design wants them.
 - All person-poster images **lazy-load** (same rule as title posters); never
