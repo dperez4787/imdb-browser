@@ -1,7 +1,7 @@
 ---
 id: IMDB-11
 title: Chat assistant UI in the SPA
-status: in-progress
+status: done
 owner: product-owner
 design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-2, IMDB-10]
@@ -138,3 +138,4 @@ behavior.
   Conventions: no `fetch()` outside the sanctioned boundary, no secrets in the
   diff, ES modules — all green. The developer's Log/PR claims all **checked out
   accurately**, including its self-reported gaps and the CORS blocker.
+- **product-owner** — status → `done`: PR #9 merged by the user (directive 2026-07-11 — human-only live criteria are deferred to the upcoming testing period, assume-works).

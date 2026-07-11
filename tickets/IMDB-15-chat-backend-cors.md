@@ -1,7 +1,7 @@
 ---
 id: IMDB-15
 title: Chat backend CORS headers so browsers can call /api/chat cross-origin
-status: in-progress
+status: done
 owner: product-owner
 depends-on: []
 branch: "imdb-15-chat-backend-cors"
@@ -111,3 +111,4 @@ is the recorded default; note any deviation in the Log and in
   shows no CORS errors. Because AC5 is not verified, PR #11 **stays a draft**
   and this ticket returns to `in-progress`. Everything mechanically
   verifiable passed.
+- **product-owner** — status → `done`: PR #11 merged by the user (directive 2026-07-11 — the human/live browser round-trip criterion is deferred to the upcoming testing period, assume-works).

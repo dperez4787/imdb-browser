@@ -1,7 +1,7 @@
 ---
-id: IMDB-15
+id: IMDB-17
 title: Governance role badge — show who the graph thinks you are
-status: backlog
+status: needs-design
 owner: product-owner
 depends-on: [IMDB-2, IMDB-4]
 branch: ""
@@ -60,3 +60,23 @@ headers are the supported mechanism today.
   `backlog` for product-owner triage and (if user-facing polish requires) a design
   pass; the badge is intentionally small enough to ride an existing design's header
   spec if the designer prefers.
+- **product-owner** — **renumbered IMDB-15 → IMDB-17.** The external filing collided
+  with the already-taken IMDB-15 (`tickets/IMDB-15-chat-backend-cors.md`, filed and
+  implemented first, PR #11). Per `tickets/README.md` numbers are never reused, so
+  this ticket takes the next free number; nothing else about the ticket changed.
+- **product-owner** — triaged. Dependencies verified: IMDB-2 (PR #6) and IMDB-4
+  (PR #8) are both merged, so the AuthGate and the `src/graphql/` client layer this
+  ticket builds on exist on `main`. Live platform facts confirmed for the
+  implementer: `X-Imdb-Roles` is **absent** (not empty) when the caller has no
+  roles; `x-imdb-policy-revision` is present on every response; both are
+  CORS-exposed via `Access-Control-Expose-Headers` (verified live against the
+  deployed router, 2026-07-11). Status → **`needs-design`**: this is user-facing
+  chrome inside DES-1's precisely specified TopBar (wordmark / omnibox / chat
+  toggle / UserMenu), and the workflow requires a `design:` link before UI work is
+  `ready-for-dev`. The designer's ask is small — a DES-1 addendum answering:
+  (1) badge placement and size next to the 32px avatar without breaking the 56px
+  TopBar; (2) the distinct, honest no-roles visual and copy (the ticket's
+  "viewer — no data role" is an example, not a decision); (3) overflow behavior for
+  multiple roles; (4) whether the badge duplicates into the UserMenu. The
+  acceptance criteria as written stand; the client-layer header plumbing mirrors
+  the IMDB-14 pattern and needs no architecture pass.
