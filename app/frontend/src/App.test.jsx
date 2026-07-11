@@ -108,12 +108,19 @@ describe('route table (docs/architecture.md — Frontend routing & URL scheme)',
     expect(screen.getByText('Browse all titles →')).toBeVisible();
   });
 
-  it('/title/:tconst renders the placeholder detail route (until IMDB-7)', () => {
+  it('/title/:tconst renders the title detail page (IMDB-7)', async () => {
+    // jsdom implements no layout; the page's DES-4 scroll reset needs a stub.
+    window.scrollTo = vi.fn();
     renderApp(['/title/tt0068646']);
     signIn();
-    expect(screen.getByRole('heading', { name: 'Title tt0068646' })).toBeVisible();
-    // Off-home, the compact omnibox lives in the TopBar.
+    // The real detail page mounts: its loading skeleton, not the old
+    // placeholder heading. Off-home, the compact omnibox lives in the TopBar.
+    expect(screen.getByRole('status', { name: 'Loading title' })).toBeInTheDocument();
     expect(screen.getByRole('banner')).toContainElement(screen.getByRole('combobox'));
+    // getIdToken is mocked to undefined here, so the query settles into the
+    // page's designed error state (signed-out guard, kind 'auth', no retry) —
+    // awaited so the state update lands inside the test.
+    expect(await screen.findByText(/Couldn’t load this title/)).toBeVisible();
   });
 
   it('/person/:nconst renders the placeholder detail route (until IMDB-8)', () => {

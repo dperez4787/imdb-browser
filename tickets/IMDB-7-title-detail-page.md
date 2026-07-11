@@ -1,12 +1,12 @@
 ---
 id: IMDB-7
 title: Title detail page
-status: ready-for-dev
+status: done
 owner: product-owner
 design: designs/DES-4-title-detail.md
 depends-on: [IMDB-4, IMDB-5, IMDB-14]
-branch: ""
-pr: ""
+branch: "imdb-7-title-detail-page"
+pr: "https://github.com/dperez4787/imdb-browser/pull/25"
 ---
 
 ## Description
@@ -88,3 +88,110 @@ before and after person pages exist.
   header tab order (tooltip on focus). No open design question remains; the
   restricted-treatment component itself ships under IMDB-14 (depends-on already
   present).
+- **developer** — claimed; `in-progress` on branch `imdb-7-title-detail-page`.
+  Live-router shape verified before writing code (2026-07-11, gcloud identity
+  token): `title(tconst:)` returns `null` for an unknown id (not-found ≠ error,
+  as DES-4 requires), `principals` carries every crew category incl. director/
+  writer entries (so credit groups are principals-driven, no separate
+  directors/writers selection needed), `episode { seasonNumber episodeNumber
+  series { … } }` hydrates (tt0959621), and `Rating.numVotes` is redacted at
+  policy revision 8 with the coordinate in
+  `extensions.governance.redactedFields` while `averageRating` arrives (9.2 for
+  tt0068646). Per the IMDB-6 file partition, the title query gets NEW graphql
+  files (`titleQueries.js`/`titleHooks.js`) — existing `queries.js`/`hooks.js`
+  untouched; genre chips render as links to `/titles?genres=…` from day one per
+  the coordination directive (IMDB-6's route lands independently).
+- **developer** — implemented; `in-review`, PR #25 (draft).
+  What changed: `src/title/` filled in — `TitlePage.jsx` (state switch, doc
+  title, scroll reset), `TitleHeader.jsx` (poster 260×390, fact line, episode
+  context), `RatingBlock.jsx` (the amended three-way governed votes slot),
+  `GenreChips.jsx` (real `/titles?genres=…` links), `CreditGroup.jsx` +
+  `PersonEntity.jsx` (non-interactive pre-IMDB-8 chips, `data-nconst` upgrade
+  seam), `PageStates.jsx` (NotFoundState/ErrorState, placed for DES-5 reuse),
+  `format.js` (formatters + `groupCredits`); new `src/graphql/titleQueries.js`
+  + `titleHooks.js` (optimistic `numVotes`, own `titleDetail` cache key,
+  denial-scoped staleTime); one appended `styles.css` section incl. the 720px
+  reflow; colocated tests (41 new, all green; full suite 416 pass / 17
+  pre-existing env-gated skips; build green).
+  Live-verified (gcloud OIDC token, rev 8, through the page's real document):
+  tt0068646 → averageRating present, numVotes absent +
+  `redactedFields:["Rating.numVotes"]`, 22 principals / 10 categories;
+  unknown id → `title: null`, no error.
+  Honest gaps: (1) browser click-through deferred per the user's directive —
+  direct-load, reflow, and live grant-flip not watched in a real browser;
+  (2) `App.test.jsx`'s `/title` block was updated (it pinned the placeholder
+  this ticket replaces) — the one shared-file edit, flagged for the IMDB-6
+  developer; (3) DES-4's wireframe shows a merged "CAST" header but its
+  normative text says headers are the data's category words — implemented the
+  text (ACTOR/ACTRESS as their own groups filling the cast slot); designer
+  may want a merged-cast follow-up; (4) the pre-existing `useTitle`/
+  `TITLE_QUERY` in hooks.js/queries.js are now superseded for this page but
+  untouched per the partition — candidates for cleanup once IMDB-6 lands;
+  (5) "Search instead" focuses the omnibox by dispatching the DES-1 global
+  `/` shortcut rather than new plumbing into `search/` files.
+- **tester** — verdict: every agent-verifiable criterion PASSES; ticket →
+  `done`, PR #25 lifted from draft. Commands: `npm ci && npm test` (clean
+  checkout: 39 files / 421 pass, 17 pre-existing env-gated skips, exit 0 —
+  incl. the developer's 41 and my 5 gap tests in
+  `app/frontend/src/title/TitlePage.tester.test.jsx`) and `npm run build`
+  (green). Per criterion:
+  - *Search-click + stable shareable URL* — **pass** (seam level).
+    `Omnibox` navigates title rows to `/title/${row.id}`; direct-load of
+    `/title/:tconst` mounts the real page inside `AuthGate`
+    (App.test.jsx route-table). Real-browser click-through **not
+    verified** — deferred per the 2026-07-11 directive.
+  - *Designed facts + poster* — **pass**. Page tests assert the fact line
+    (`1972 · Movie · 2h 55m`), amber 9.2, doc title
+    `The Godfather (1972) — Marquee`, one lazy OMDb request for the page's
+    tconst. LIVE (gcloud token, rev 8, through the page's real
+    `TITLE_DETAIL_QUERY` import): tt0068646 returns every selected field.
+  - *Governed numVotes (amended)* — **pass** on the agent-verifiable
+    surface. Denied → page fully intact, `RestrictedValue` pill in the
+    votes line's box, tabbable; LIVE: tt0068646 answers HTTP 200,
+    `averageRating: 9.2`, `numVotes` absent,
+    `redactedFields: ["Rating.numVotes"]`. Both confusion directions
+    tested: rating null + nothing denied → no block, no pill; numVotes
+    null + not denied → silent absence, never the pill; denied + no rating
+    at all → block absent (LIVE confirmed: unrated tt9916856 "The Wind"
+    still reports the document-scoped denial; the page shows no block).
+    Grant-flip mechanism verified (optimistic select re-sent every fetch,
+    denial-scoped 60 s staleTime, granted-value-wins test); an actual
+    console grant flip is a user-only action — **not verified** live.
+  - *720px reflow* — **pass at the stylesheet level** (IMDB-17 precedent:
+    jsdom computes no layout). Tester pins: the ≤720px block sets
+    `.title-header` to a single centered `minmax(0, 1fr)` column and
+    `.credit-group__list` to one full-width column; both grids use
+    `minmax(0, …)` tracks so nothing forces horizontal scroll. Visual
+    reflow in a real browser **not verified** (deferred per directive).
+  - *Credits grouped per design, pre-IMDB-8 safe* — **pass**. Groups are
+    data-driven (unknown `grip_wrangler` renders as its own group; no
+    category allowlist in code — `categoryPriority` is ordering only),
+    DES-4 order director → writer → cast slot → API order asserted at page
+    and unit level; person chips are `<span>`s, no anchor, not tabbable,
+    `data-nconst` seam present — nothing can 404. LIVE: tt0068646 → 22
+    principals / 10 categories incl. director+writer, so principals-driven
+    groups hold against the real router. NOTE for the designer: DES-4's
+    wireframe shows a merged `CAST` header while its normative text says
+    headers are the data's category words — the implementation follows the
+    text (ACTOR / ACTRESS groups fill the cast slot). Conformant as
+    specced; flagging the wireframe/text divergence for a DES-4 erratum or
+    a merged-cast follow-up.
+  - *Episode context* — **pass**. Page test renders `S1 · E7 of` with the
+    series linked to `/title/:tconst`; LIVE: tt2301451 "Ozymandias" →
+    `S5E14 of "Breaking Bad" (tt0903747)` hydrates through the page's
+    document.
+  - *Not-found vs error vs loading* — **pass**, and the two failure states
+    are provably distinct: unknown id resolves `title: null` (LIVE:
+    tt9999999999 → HTTP 200, `title: null`, zero errors) → designed
+    not-found with freshness caveat, Back, and Search-instead (dispatches
+    the `/` shortcut); transport failure → designed error with working
+    Retry (tested through refetch into the page); loading skeleton
+    shimmers and never shows the hatch.
+  - *AuthGate* — **pass** (structural). The route renders inside
+    `AuthGate` in App.jsx; App.test.jsx reaches the page only after
+    `signIn()`.
+  Conventions: no `fetch()`/inline queries in components (all data via
+  `graphql/titleHooks.js`), no new secrets in the diff, router-only access.
+  Not verified overall (honest list): real-browser click-through,
+  visual 720px reflow, live grant flip at the governance console — all
+  deferred per directive; everything else passed.
