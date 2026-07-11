@@ -1,7 +1,7 @@
 ---
 id: IMDB-10
 title: Chat backend scaffold — Anthropic agentic loop with GraphQL MCP on Cloud Run
-status: in-progress
+status: done
 owner: product-owner
 depends-on: []
 branch: "imdb-10-chat-backend-scaffold"
@@ -136,3 +136,4 @@ dedicated modules per CLAUDE.md.
   `app/chat/.env`, obtain a Firebase ID token by signing in with Google, POST a
   data question to /api/chat with that Bearer token, and confirm a streamed answer
   plus `tool call: …` lines in the server log (details in the PR comment).
+- **user** (recorded by main session) — live verification performed by the user (2026-07-11): the criteria the testers marked NOT VERIFIED (real Google sign-in flow for IMDB-2; authenticated end-to-end chat conversation for IMDB-10) passed. Drafts lifted and PRs merged on the user's explicit authorization. Ticket done.

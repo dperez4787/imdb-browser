@@ -1,7 +1,7 @@
 ---
 id: IMDB-2
 title: Firebase Auth with Google-only sign-in behind an AuthGate
-status: in-progress
+status: done
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-1]
@@ -109,3 +109,4 @@ signed-in user indicator + sign-out affordance in the app shell.
   a Google account and confirm you land in the shell with your name/avatar; reload
   and confirm you stay signed in (curtain, no re-prompt, no sign-in flash); sign
   out from the avatar menu and confirm immediate return to the sign-in screen.
+- **user** (recorded by main session) — live verification performed by the user (2026-07-11): the criteria the testers marked NOT VERIFIED (real Google sign-in flow for IMDB-2; authenticated end-to-end chat conversation for IMDB-10) passed. Drafts lifted and PRs merged on the user's explicit authorization. Ticket done.
