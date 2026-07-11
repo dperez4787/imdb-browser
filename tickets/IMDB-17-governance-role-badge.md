@@ -1,11 +1,11 @@
 ---
 id: IMDB-17
 title: Governance role badge — show who the graph thinks you are
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-2, IMDB-4]
-branch: ""
+branch: imdb-17-governance-role-badge
 pr: ""
 ---
 
@@ -99,3 +99,23 @@ headers are the supported mechanism today.
   never a guessed state) from `[]` (header absent → no-roles state), matching the
   verified live contract. Hook named `useGovernanceRoles()` in `src/graphql/` per
   the AC. Status → **`ready-for-dev`**; `design:` set.
+- **developer** — claimed; branch `imdb-17-governance-role-badge` off `origin/main`.
+  Implemented the role signal as a module-level store
+  (`src/graphql/rolesStore.js`, `useSyncExternalStore`, mirroring
+  `searchTextStore`): `null` = no response yet (Unknown), `[]` = a response with
+  `X-Imdb-Roles` absent (no roles), otherwise the header's values in order;
+  `x-imdb-policy-revision` → `revision` (extensions fallback). The client feeds
+  it from every resolved response — the sole `client.js` touch is additive:
+  `rawExecute` now also destructures `headers` off the existing
+  `client.rawRequest(...)` and calls `ingestResponse(headers, extensions)`
+  before returning; the resolved `{ data, extensions }` shape and error
+  normalization are untouched. New `RoleBadge` (fixed 104px slot, solid pill /
+  dashed `no data role` / empty slot) mounts inside the single `UserMenu`
+  trigger left of the avatar (no new tab stop); the trigger's aria-label
+  extends with the state (` — data roles: …` / ` — no data role`, silent) and
+  the menu gains a static, non-focusable **Data roles** section with
+  `policy rev <n>`. Files: `src/graphql/rolesStore.js` (+test),
+  `src/graphql/client.js` (additive), `src/graphql/index.js` (re-export),
+  `src/RoleBadge.jsx` (+test), `src/UserMenu.jsx` (+tests), `src/styles.css`.
+  No other view touched; the roles-present *live* path is seam-tested only and
+  deferred per the user directive (the verifying identity maps to no persona).

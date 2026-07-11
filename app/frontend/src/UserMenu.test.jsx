@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import UserMenu from './UserMenu.jsx';
 import { signOutUser, subscribeToAuth } from './auth.js';
+import { ingestResponse, resetGovernanceRoles } from './graphql/rolesStore.js';
 
 vi.mock('./auth.js', () => ({
   subscribeToAuth: vi.fn(),
@@ -21,12 +22,18 @@ let authListener;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetGovernanceRoles(); // every test starts at Unknown
   subscribeToAuth.mockImplementation((listener) => {
     authListener = listener;
     return () => {};
   });
   signOutUser.mockResolvedValue(undefined);
 });
+
+/** Feed the governance role signal exactly as client.js does off a response. */
+function ingest(map) {
+  act(() => ingestResponse(new Headers(map)));
+}
 
 const fullUser = {
   uid: 'u1',
@@ -137,5 +144,67 @@ describe('UserMenu', () => {
     fireEvent.mouseDown(document.body);
 
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+});
+
+// IMDB-17 (DES-1 addendum): the governance role badge on the trigger and the
+// "Data roles" menu section, driven by the same module store client.js feeds.
+describe('UserMenu — governance role badge (IMDB-17)', () => {
+  it('carries the RoleBadge inside the single trigger, left of the avatar (no new tab stop)', () => {
+    renderMenu();
+    // One button in the trigger — the badge adds no tab stop.
+    const button = screen.getByRole('button', { name: 'Account: Danny Perez' });
+    expect(button.querySelector('.role-badge')).toBeInTheDocument();
+
+    ingest({ 'X-Imdb-Roles': 'analyst,public', 'X-Imdb-Policy-Revision': '12' });
+    expect(button.querySelector('.role-badge')).toHaveAttribute('data-roles', 'analyst,public');
+  });
+
+  it('accessible name: unknown = just the name; then extends with the badge state, silently', () => {
+    renderMenu();
+    // Unknown (no response yet) — the name only, so the base IMDB-2 contract holds.
+    expect(screen.getByRole('button', { name: 'Account: Danny Perez' })).toBeInTheDocument();
+
+    ingest({ 'X-Imdb-Roles': 'analyst,public', 'X-Imdb-Policy-Revision': '12' });
+    expect(
+      screen.getByRole('button', { name: 'Account: Danny Perez — data roles: analyst, public' }),
+    ).toBeInTheDocument();
+
+    ingest({ 'X-Imdb-Policy-Revision': '13' }); // header absent → no roles
+    expect(
+      screen.getByRole('button', { name: 'Account: Danny Perez — no data role' }),
+    ).toBeInTheDocument();
+  });
+
+  it('menu Data roles section: lists roles and the policy revision when present', () => {
+    renderMenu();
+    ingest({ 'X-Imdb-Roles': 'analyst,public', 'X-Imdb-Policy-Revision': '12' });
+
+    fireEvent.click(screen.getByRole('button', { name: /Account: Danny Perez/ }));
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveTextContent('Data roles');
+    expect(menu).toHaveTextContent('analyst, public');
+    expect(menu).toHaveTextContent('policy rev 12');
+    // Still exactly one action — the section is static text, not a menu item.
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+  });
+
+  it('menu Data roles section: no-roles shows the exact copy and the redaction explanation', () => {
+    renderMenu();
+    ingest({ 'X-Imdb-Policy-Revision': '12' }); // header absent → no roles
+
+    fireEvent.click(screen.getByRole('button', { name: /Account: Danny Perez/ }));
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveTextContent('No data role');
+    expect(menu).toHaveTextContent(/Governed fields are redacted for you/);
+    expect(menu).toHaveTextContent('policy rev 12');
+  });
+
+  it('menu Data roles section: shows an em dash while Unknown (never reflows on first response)', () => {
+    renderMenu();
+    fireEvent.click(screen.getByRole('button', { name: 'Account: Danny Perez' }));
+    const section = screen.getByRole('menu').querySelector('.user-menu__roles');
+    expect(section).toHaveTextContent('—');
+    expect(section).not.toHaveTextContent('policy rev');
   });
 });

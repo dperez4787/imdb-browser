@@ -250,10 +250,11 @@ body {
 }
 
 .user-menu__button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* the RoleBadge slot sits 8px left of the avatar (DES-1 addendum) */
   padding: 0;
   border: none;
-  border-radius: 50%;
   background: none;
   cursor: pointer;
 }
@@ -264,6 +265,51 @@ body {
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+/* ---- RoleBadge (IMDB-17, DES-1 addendum) ------------------------------- */
+
+/* Fixed 104px slot, pill right-aligned against the avatar — constant width in
+   every state so a role flip (or first appearance) never shifts the TopBar. */
+.role-badge {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 104px;
+}
+
+.role-badge__pill {
+  height: 20px;
+  max-width: 11ch; /* ellipsis past ~11ch (multi-role / long name) */
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 11px;
+  font-variant: small-caps; /* presentation only — the role string is never rewritten */
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* No roles: dashed hairline + muted text, reading as "an empty slot where a
+   role would go". No amber, no lock glyph — nothing is withheld here. */
+.role-badge__pill--none {
+  border-style: dashed;
+  background: none;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  /* The collapsed TopBar has no room; the menu section is the sole surface. */
+  .role-badge {
+    display: none;
+  }
 }
 
 .monogram {
@@ -304,6 +350,39 @@ body {
 .user-menu__email {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+/* ---- UserMenu "Data roles" section (IMDB-17) --------------------------- */
+
+.user-menu__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.user-menu__roles-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+
+.user-menu__roles-value {
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.user-menu__roles-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.user-menu__roles-rev {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .user-menu__signout {
