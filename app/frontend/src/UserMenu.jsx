@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './AuthContext.jsx';
 import Monogram from './Monogram.jsx';
+import RoleBadge from './RoleBadge.jsx';
+import { resetGovernanceRoles, useGovernanceRoles } from './graphql/rolesStore.js';
 
 // The signed-in identity + sign-out affordance (DES-1). An avatar button (the
 // user's Google photo, or a Monogram when the photo is missing or fails to
@@ -9,8 +11,15 @@ import Monogram from './Monogram.jsx';
 // Sign out. Keyboard: opens on Enter/Space (native button), focus moves into
 // the menu, Tab is trapped while open, Esc closes and returns focus to the
 // avatar button.
+//
+// IMDB-17 (DES-1 addendum): the trigger also wears the governance RoleBadge
+// (left of the avatar, one click target, no new tab stop) and the menu gains a
+// static "Data roles" section explaining who the graph thinks you are. The
+// trigger's accessible name carries the badge state (no aria-live, per the
+// addendum's no-announcement stance).
 export default function UserMenu() {
   const { user, signOut } = useAuth();
+  const { roles, revision } = useGovernanceRoles();
   const [open, setOpen] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const rootRef = useRef(null);
@@ -18,6 +27,19 @@ export default function UserMenu() {
   const signOutRef = useRef(null);
 
   const label = user.displayName ?? user.email ?? 'Signed in';
+
+  // The trigger's accessible name extends with the badge state (DES-1 addendum):
+  // "<name> — data roles: …" / "<name> — no data role" / just the name while
+  // Unknown. Silent — no aria-live; a screen-reader user reads the current
+  // state off the trigger or in the menu.
+  let roleSuffix = '';
+  if (Array.isArray(roles)) {
+    roleSuffix = roles.length === 0 ? ' — no data role' : ` — data roles: ${roles.join(', ')}`;
+  }
+
+  // Sign-out returns the session to Unknown: the shell (and this menu) unmounts,
+  // so a fresh sign-in starts blank rather than flashing the prior user's roles.
+  useEffect(() => () => resetGovernanceRoles(), []);
 
   // Close on click/tap outside.
   useEffect(() => {
@@ -67,9 +89,10 @@ export default function UserMenu() {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Account: ${label}`}
+        aria-label={`Account: ${label}${roleSuffix}`}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
+        <RoleBadge />
         {user.photoURL && !avatarFailed ? (
           <img
             className="user-menu__avatar"
@@ -94,6 +117,28 @@ export default function UserMenu() {
               <span className="user-menu__name">{user.displayName}</span>
             )}
             {user.email && <span className="user-menu__email">{user.email}</span>}
+          </div>
+          {/* Data roles — static, non-focusable text (the badge's explainer and
+              the sole role surface below 720px). Not a menu item: skipped by
+              menu keyboard nav, Sign out stays the only action. */}
+          <div className="user-menu__roles" data-roles={Array.isArray(roles) ? roles.join(',') : undefined}>
+            <span className="user-menu__roles-label">Data roles</span>
+            {roles == null ? (
+              <span className="user-menu__roles-value">—</span>
+            ) : roles.length === 0 ? (
+              <>
+                <span className="user-menu__roles-value">No data role</span>
+                <span className="user-menu__roles-note">
+                  Governed fields are redacted for you. A graph admin can grant a role — it takes
+                  effect live, no reload.
+                </span>
+              </>
+            ) : (
+              <span className="user-menu__roles-value">{roles.join(', ')}</span>
+            )}
+            {revision != null && (
+              <span className="user-menu__roles-rev">policy rev {revision}</span>
+            )}
           </div>
           <button
             ref={signOutRef}
