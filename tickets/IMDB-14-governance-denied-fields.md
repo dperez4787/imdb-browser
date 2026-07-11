@@ -1,11 +1,11 @@
 ---
 id: IMDB-14
 title: Governance-denied fields — client 'denied' handling + shared restricted-field treatment
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-8-restricted-field-treatment.md
 depends-on: [IMDB-4]
-branch: ""
+branch: "imdb-14-governance-denied-fields"
 pr: ""
 ---
 
@@ -113,3 +113,11 @@ invisible for an hour and wreck the demo.
   and both specs now state that no rendered element depends on a governed field
   (DES-2's votes parenthetical is opportunistic and silently absent while denied).
   Architecture and design both settled → `ready-for-dev`.
+- **developer** — claimed. Branch `imdb-14-governance-denied-fields`. Implementing the
+  architecture § Field-level governance contract: `denied` kind before the HTTP-status
+  rule in `errors.js`, optimistic-select + strip-and-retry in `client.js`, hooks
+  resolving `{ data, deniedFields }` with denial-scoped 60 s staleTime, `denied`
+  non-retryable in `queryClient.js`, plus the shared `RestrictedValue` component per
+  DES-8. IMDB-5 runs in parallel; staying strictly inside the existing
+  `src/graphql/` files + new `src/components/RestrictedValue.*` files + an appended
+  `styles.css` section.
