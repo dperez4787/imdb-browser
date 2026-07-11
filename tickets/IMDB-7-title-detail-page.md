@@ -1,10 +1,10 @@
 ---
 id: IMDB-7
 title: Title detail page
-status: ready-for-dev
+status: needs-design
 owner: product-owner
 design: designs/DES-4-title-detail.md
-depends-on: [IMDB-4, IMDB-5]
+depends-on: [IMDB-4, IMDB-5, IMDB-14]
 branch: ""
 pr: ""
 ---
@@ -30,8 +30,18 @@ before and after person pages exist.
 - Clicking a title in universal search opens its detail page at a stable, shareable
   URL; loading that URL directly while signed in renders the same page.
 - The page shows the designed title facts hydrated through the router (at minimum:
-  primary title, year, genres, rating with vote count, runtime where present) and the
-  OMDb poster or designed fallback.
+  primary title, year, genres, star rating, runtime where present; vote count when the
+  router grants it) and the OMDb poster or designed fallback.
+- `Rating.numVotes` is governed at the router and currently denied to everyone: with
+  it denied, the page still renders fully — star rating and every ungoverned fact
+  intact — and the vote-count slot shows the designed restricted-field treatment
+  (IMDB-14): never an error page, never a silent gap indistinguishable from a title
+  with no rating data. When a grant is enabled at the governance console, a fresh
+  load shows the real vote count with no redeploy; re-denied, the restricted
+  treatment returns on the next fresh load.
+- Below the design's narrow-viewport breakpoint the page reflows as DES-4 specifies
+  (poster centered above the header, credit groups stacked full-width) with no
+  horizontal page scroll.
 - Cast/crew are listed grouped as the design specifies, showing each person's name;
   with IMDB-8 unmerged these entries render per the design's pre-person-page
   treatment and nothing 404s.
@@ -56,3 +66,14 @@ before and after person pages exist.
   all drawn). Route literal follows the architect's routing decision (spec assumes
   `/title/:tconst`); credits-shape field names are introspection-verified per the
   ticket. No open design decision remains → `ready-for-dev`.
+- **product-owner** — amended for router field-level governance (see IMDB-14 and
+  IMDB-4's Log/PR #8): `Rating.numVotes` is governed and currently denied to
+  everyone, live. AC now require the designed restricted-field treatment in the
+  vote-count slot under denial, clean upgrade/degrade on grant changes (next fresh
+  fetch, no redeploy — the user will toggle grants in a demo), and the DES-4
+  narrow-viewport reflow as an explicit criterion. Added depends-on IMDB-14 (which
+  ships the `denied` error kind and the shared treatment) and moved back to
+  `needs-design`: DES-4's RatingBlock assumes `numVotes` is readable and must be
+  revised (restricted state distinct from "no rating data") before this is buildable.
+  Amended now, pre-implementation, because changing an unstarted ticket is cheaper
+  than a follow-up ticket against shipped code.

@@ -1,10 +1,10 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: ready-for-dev
+status: needs-design
 owner: product-owner
 design: designs/DES-5-person-detail.md
-depends-on: [IMDB-5, IMDB-7]
+depends-on: [IMDB-5, IMDB-7, IMDB-14]
 branch: ""
 pr: ""
 ---
@@ -30,6 +30,18 @@ filmography organization — by category? known-for first?), how title entries d
 - The page shows the person's name with the designed placeholder visual treatment (no
   broken images, no real photo expected) and their filmography/known-for titles as the
   design specifies, hydrated through the router.
+- `Name.birthYear` and `Name.deathYear` are governed at the router and currently
+  denied to everyone: with them denied, the page still renders fully and the lifespan
+  line shows the designed restricted-field treatment (IMDB-14) — visibly different
+  from a person with no recorded birth year, never an error page. When a grant is
+  enabled at the governance console, a fresh load shows the real years with no
+  redeploy; re-denied, the restricted treatment returns on the next fresh load.
+- The known-for strip renders under the current deny-everyone state of
+  `Rating.numVotes`: its fallback selection (per revised DES-5) does not require
+  reading `numVotes`, and no query this page issues fails because of a governed field.
+- Below the design's narrow-viewport breakpoint the page reflows as DES-5 specifies
+  (header stacks, known-for strip scrolls horizontally, filmography drops the rating
+  column) with no horizontal page scroll.
 - Clicking a filmography entry navigates to that title's detail page; on a title
   detail page, clicking a cast/crew person navigates here — cross-navigation works in
   both directions.
@@ -57,3 +69,14 @@ filmography organization — by category? known-for first?), how title entries d
   architect to confirm; field names introspection-verified per the ticket. The design
   itself leaves no decision open → `ready-for-dev` (data-layer ordering rides
   depends-on IMDB-5/IMDB-7).
+- **product-owner** — amended for router field-level governance (see IMDB-14 and
+  IMDB-4's Log/PR #8): `Name.birthYear` and `Name.deathYear` are governed and
+  currently denied to everyone, live; `Rating.numVotes` (which DES-5's known-for
+  fallback ranks by) likewise. AC now require the restricted-field treatment on the
+  lifespan line under denial (distinct from absent data — DES-5's current "absent if
+  no birth year" rule conflates the two), clean upgrade/degrade on grant changes
+  (next fresh fetch, no redeploy — the user will toggle grants in a demo), a
+  denial-safe known-for fallback, and the DES-5 narrow-viewport reflow as an explicit
+  criterion. Added depends-on IMDB-14 and moved back to `needs-design` pending the
+  DES-5 revision. Amended now, pre-implementation, because changing an unstarted
+  ticket is cheaper than a follow-up ticket against shipped code.
