@@ -1,7 +1,7 @@
 ---
 id: IMDB-7
 title: Title detail page
-status: needs-design
+status: ready-for-dev
 owner: product-owner
 design: designs/DES-4-title-detail.md
 depends-on: [IMDB-4, IMDB-5, IMDB-14]
@@ -77,3 +77,14 @@ before and after person pages exist.
   revised (restricted state distinct from "no rating data") before this is buildable.
   Amended now, pre-implementation, because changing an unstarted ticket is cheaper
   than a follow-up ticket against shipped code.
+- **ui-ux-designer** — DES-4 revised for governance; back to `ready-for-dev`. The
+  vote-count slot now has three explicitly distinct states: value present →
+  `2.1M votes`; `Rating.numVotes` in `deniedFields` → the inline `RestrictedValue`
+  pill from `designs/DES-8-restricted-field-treatment.md` (stars and all other
+  facts unaffected, zero layout jump on grant flips); no rating at all, nothing
+  denied → whole block absent as before. Data needs updated: the query keeps
+  selecting `numVotes` optimistically per architecture § Field-level governance
+  (co-select rule already satisfied by `averageRating`). Restricted pill joins the
+  header tab order (tooltip on focus). No open design question remains; the
+  restricted-treatment component itself ships under IMDB-14 (depends-on already
+  present).
