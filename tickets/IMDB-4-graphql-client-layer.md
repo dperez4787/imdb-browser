@@ -1,10 +1,10 @@
 ---
 id: IMDB-4
 title: GraphQL client layer for the SPA
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 depends-on: [IMDB-1, IMDB-2, IMDB-3]
-branch: ""
+branch: "imdb-4-graphql-client-layer"
 pr: ""
 ---
 
@@ -58,3 +58,10 @@ and IMDB-2's auth (the credential presumably derives from the signed-in Firebase
   authenticated (returns `rebuiltAt: null` — index never rebuilt; the field exists
   and the query 200s, so it remains a fine smoke query). Anonymous requests are
   rejected 401 by the router (verified live).
+- **developer** — claimed. Branch `imdb-4-graphql-client-layer` off `origin/main`
+  (post IMDB-2/IMDB-10 merges). Plan: `graphql-request` + TanStack Query v5 per the
+  settled architecture; transport/queries/errors/hooks all under
+  `app/frontend/src/graphql/`; `QueryClientProvider` wired in `main.jsx`; live
+  verification of every operation document against the router with a Google OIDC
+  identity token (the other configured JWKS provider) since a Firebase ID token
+  cannot be minted non-interactively.
