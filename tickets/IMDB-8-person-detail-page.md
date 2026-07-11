@@ -1,7 +1,7 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: needs-design
+status: ready-for-dev
 owner: product-owner
 design: designs/DES-5-person-detail.md
 depends-on: [IMDB-5, IMDB-7, IMDB-14]
@@ -80,3 +80,18 @@ filmography organization — by category? known-for first?), how title entries d
   criterion. Added depends-on IMDB-14 and moved back to `needs-design` pending the
   DES-5 revision. Amended now, pre-implementation, because changing an unstarted
   ticket is cheaper than a follow-up ticket against shipped code.
+- **ui-ux-designer** — DES-5 revised for governance; back to `ready-for-dev`. The
+  lifespan line now has a full denied-vs-missing matrix: no recorded birth year and
+  nothing denied → line absent (unchanged, ordinary missing data); any lifespan
+  coordinate in `deniedFields` → the line always renders, with the inline
+  `RestrictedValue` pill (`designs/DES-8-restricted-field-treatment.md`) in each
+  denied year slot (`▨▨🔒▨▨ – 2015` / `1940 – ▨▨🔒▨▨`) and the line-level variant
+  (`▨▨▨🔒▨▨▨ RESTRICTED`) when both are denied — the two families cannot be
+  confused, and grant flips swap pill ↔ year in place with zero layout jump. The
+  known-for strip is now sourced from `Name.knownForTitles` in dataset order and
+  **never reads `numVotes`** — the old top-4-by-`numVotes` fallback is retired
+  (trigger disproven by the architect's live verification; ranking field
+  governed). Data needs updated to select governed fields optimistically per
+  architecture § Field-level governance; no rendered element on this page depends
+  on one. No open design question remains (data-layer ordering rides depends-on
+  IMDB-14 as before).
