@@ -1,11 +1,11 @@
 ---
 id: IMDB-12
 title: Deploy pipeline — Firebase Hosting + Cloud Run via OIDC/WIF
-status: in-progress
+status: in-review
 owner: product-owner
 depends-on: [IMDB-1, IMDB-10]
 branch: "imdb-12-deploy-pipeline"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/18"
 ---
 
 ## Description
@@ -70,3 +70,4 @@ exact provisioning steps/values for the user to run, then wiring the workflow to
   SHA-tagged image, pinned firebase-tools, deploy from repo root).
 - **main session** — GCP provisioning executed by the user and verified (2026-07-11): WIF provider ACTIVE, deploy/runtime SAs + roles, AR repo, ANTHROPIC_API_KEY v1, GitHub secrets re-set literal. Hosting site is `dfp-imdb-browser` (the planned id was globally reserved) — prod URL will be https://dfp-imdb-browser.web.app; deploy must target that site. Auth authorized-domain console step still pending, does not block the workflow build. Status → ready-for-dev.
 - **developer** — claimed. Branch `imdb-12-deploy-pipeline`. Scope: `.github/workflows/deploy.yml`, `firebase.json`, `.firebaserc` per the architecture doc's workflow-shape paragraph (hosting site `dfp-imdb-browser` via named target; chat image SHA-tagged to AR repo `imdb-browser`; OIDC/WIF only).
+- **developer** — implemented; status → in-review, PR #18 (draft). Files: `.github/workflows/deploy.yml`, `firebase.json`, `.firebaserc`. Workflow mirrors linear-example's deploy.yml (per-job `id-token: write`, SHA-tagged image never `latest`, `firebase-tools` pinned to 13.29.2, deploy from repo root) with two commented departures: (1) `frontend` job `needs: chat` and resolves the live Cloud Run URL via `gcloud run services describe` to feed `VITE_CHAT_URL` into the Vite build — deterministic even on the first run, since the chat job creates the service first; (2) named hosting target `dfp-imdb-browser` because the project's default site serves linear-example. Verified locally: actionlint clean; `docker build app/chat` succeeds and the image smoke-runs (listens on `$PORT`, serves HTTP, starts without `ANTHROPIC_API_KEY`); frontend build with a placeholder `VITE_CHAT_URL` succeeds and the URL is inlined into the bundle (localhost fallback gone); `firebase target` resolves the `.firebaserc` mapping and `hosting:sites:list` confirms site `dfp-imdb-browser` exists apart from the default site. NOT verified — honestly: the workflow itself never ran (it triggers only on push to `main`; hosting has no dry-run; no deploy of any kind was performed from this branch), so AC 2–3 (live run, live URLs, secret injection on Cloud Run) are verifiable only on first merge, from the Actions logs + `https://dfp-imdb-browser.web.app` + the chat service URL. Outstanding user step, deploy-unaffected: add `dfp-imdb-browser.web.app` to Firebase Auth authorized domains, else prod sign-in fails.
