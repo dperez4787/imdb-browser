@@ -1,9 +1,9 @@
 ---
 id: IMDB-14
 title: Governance-denied fields — client 'denied' handling + shared restricted-field treatment
-status: needs-design
+status: ready-for-dev
 owner: product-owner
-design: ""                                # designer to add: restricted-field treatment spec
+design: designs/DES-8-restricted-field-treatment.md
 depends-on: [IMDB-4]
 branch: ""
 pr: ""
@@ -95,3 +95,21 @@ invisible for an hour and wreck the demo.
   foundation for the governance-aware ACs added to IMDB-7/8/9; those tickets now
   depend on this one. IMDB-5/6 got Log advisories only (they display no governed
   field, but their design query snippets must stop selecting them).
+- **ui-ux-designer** — design settled: **`designs/DES-8-restricted-field-treatment.md`**
+  (approved) is the shared treatment — `RestrictedValue`, a static hatched
+  redaction pill with a lock glyph occupying exactly the replaced value's line box;
+  inline and line-level variants; tooltip on hover *and* keyboard focus; SR text
+  `"<Label>: restricted by data governance."`; zero layout jump on grant flips in
+  both directions; driven solely by the hook's `deniedFields` per the two-rule
+  contract in architecture § Field-level governance. Revised in the same pass:
+  DES-4 (RatingBlock's three-way vote-count slot: value / restricted pill / whole
+  block absent), DES-5 (lifespan denied-vs-missing matrix, line-level variant when
+  both years denied; known-for strip now `knownForTitles` dataset order — never
+  reads `numVotes`), DES-6 (card pick = first known-for entry, silent opportunistic
+  max-voted upgrade when granted, no treatment on cards). One deliberate deviation
+  from this ticket's description: DES-2/DES-3 snippets were **not trimmed** — per
+  the architect's optimistic-select policy they keep selecting `numVotes` with
+  explicit governance notes (the full document is the grant-detection mechanism),
+  and both specs now state that no rendered element depends on a governed field
+  (DES-2's votes parenthetical is opportunistic and silently absent while denied).
+  Architecture and design both settled → `ready-for-dev`.

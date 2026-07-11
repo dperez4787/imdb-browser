@@ -56,6 +56,13 @@ itself are missing.
 - Header: `primaryTitle` (h1). Fact line: `startYear · titleType · runtime`, each
   segment dropping out silently if absent. Rating block right-aligned: amber `★ 9.2`
   large, `numVotes` compact-formatted beneath, whole block absent if no rating.
+  The vote-count line under the stars is a **governed slot** (`Rating.numVotes` —
+  currently denied to everyone): its three states are distinct by design —
+  value present → `2.1M votes`; coordinate in `deniedFields` → the inline
+  `RestrictedValue` pill (DES-8), stars and every other fact unaffected;
+  no rating at all (nothing denied) → the whole block absent as before. "No
+  rating data" (block gone) must never look like "vote count restricted" (block
+  present, votes line redacted).
 - `GenreChips`: one chip per genre; each links to the faceted view pre-filtered to
   that genre (`/titles?…genre…` per the routing decision). **Until IMDB-6 ships, the
   chips render as static (non-link) chips** — same look, no anchor; flipping them to
@@ -94,6 +101,17 @@ Error (query fails):
 
 Partial data:       Any absent field drops its segment/block
                     silently (no “N/A” text anywhere on the page).
+
+Restricted field (Rating.numVotes in deniedFields — the live
+default today):
+                    ★ 9.2
+                    ▨▨▨🔒▨▨▨      ← inline RestrictedValue (DES-8),
+                                    label “Vote count”, in the votes
+                                    line’s exact box. Page otherwise
+                                    identical to the happy path. A
+                                    grant flip swaps pill ↔ value in
+                                    place on the next fresh fetch —
+                                    zero layout jump either way.
 ```
 
 ## Components
@@ -102,7 +120,10 @@ Partial data:       Any absent field drops its segment/block
   (loading / not-found / error / page).
 - `TitleHeader` — poster (`PosterImage`), h1, fact line, `RatingBlock`, `GenreChips`.
 - `RatingBlock` — amber star + rating + compact votes (reusable; DES-3's cards use
-  the inline variant).
+  the inline variant). Consumes the hook's `deniedFields`: when
+  `isRestricted(deniedFields, 'Rating.numVotes')`, the votes line renders
+  `RestrictedValue` (DES-8, `variant: inline`, label "Vote count"); when `numVotes`
+  is merely null/absent, the votes line drops silently as before.
 - `GenreChip` — genre pill; link or static variant per IMDB-6 availability.
 - `CreditGroup` — category header + entries.
 - `PersonEntity` — `EntityChip` for a person (+ optional character text);
@@ -122,7 +143,9 @@ Partial data:       Any absent field drops its segment/block
 - Person chip click (once IMDB-8 exists) navigates to that person's page. Before
   that: not focusable, not clickable, visually identical minus hover affordance.
 - Keyboard: focus order is header → genre chips → credit entries in reading order;
-  all interactive elements are anchors reachable by Tab, activated by Enter.
+  all interactive elements are anchors reachable by Tab, activated by Enter. When
+  the vote-count slot is restricted, its `RestrictedValue` pill joins the header's
+  tab order (focus opens the explaining tooltip, Esc closes it — DES-8).
 - Scroll position resets to top on navigation to this page.
 - Long cast lists render fully (no pagination); character text truncates to one line
   with ellipsis and full text in `title`.
@@ -157,3 +180,12 @@ assumed — if the API groups differently, `CreditGroup` consumes whatever group
 exists; the design needs `category`, person stub (`id`, `primaryName`), and
 `characters` where present). Not-found must be distinguishable from error (null
 result vs GraphQL error).
+
+**Governance (architecture § Field-level governance):** `Rating.numVotes` is
+governed and currently denied to everyone. The query **keeps selecting it
+optimistically** — the client strips denied coordinates and retries, and the hook
+delivers `deniedFields` alongside `data`, so a live grant appears on the next fresh
+fetch with no code change. The selection above already satisfies the co-select
+rule (`averageRating` sits beside `numVotes`, so a strip degrades the votes line,
+never the whole `rating` object). The page renders fully under denial; only the
+vote-count slot changes (see Layout/States).

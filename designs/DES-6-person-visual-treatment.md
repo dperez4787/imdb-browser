@@ -28,7 +28,7 @@ as an open alternative.
 |---|---|---|---|
 | Autocomplete person rows (DES-2) | `Monogram` 40px — **never mosaic** | 0 | Autocomplete renders on every keystroke; N extra poster requests per keystroke is the wrong trade, and at 40px a mosaic is mush. |
 | Person page header (DES-5's `PersonVisual` slot) | **KnownForMosaic 2×2**, 160px | ≤4 per page view | One page, one person, above the fold — the flagship surface where "shown as their work" lands. |
-| Person cards on larger surfaces (people-filter chips in DES-3, any future person grid) | Single poster thumb — the most-voted known-for title (client-side max over `rating.numVotes`, already fetched) — with a small monogram badge overlay | ≤1 per card, lazy | Cheap, still says "their work", degrades to plain monogram. |
+| Person cards on larger surfaces (people-filter chips in DES-3, any future person grid) | Single poster thumb — the **first `knownForTitles` entry** (dataset order; when `rating.numVotes` values are present, i.e. the field is granted, upgrade to the client-side max — see Behavior) — with a small monogram badge overlay | ≤1 per card, lazy | Cheap, still says "their work", degrades to plain monogram; the pick never depends on a governed field. |
 
 ## Layout
 
@@ -86,11 +86,20 @@ bottom-left; poster fails or no known-for id → plain `Monogram`. Same ladder, 
 - Tile failures are silent: no retry UI, no broken image, just the ladder.
 - The header visual never causes layout shift: the 160px square is reserved from
   first paint with the monogram in it.
-- Card-variant poster pick: the known-for title with the highest `rating.numVotes` —
-  a client-side max over data the list query already fetched; never an extra GraphQL
-  request. (The feasibility verdict came back **yes on all three gates** — see Data
-  needs — so the monogram-everywhere contingency is retired; the monogram remains as
-  every ladder's floor.)
+- **Card-variant poster pick (denial-safe by construction —
+  architecture § Person visuals + § Field-level governance):** the primary rule is
+  the **first `knownForTitles` entry** (dataset order — IMDb's own curation, an
+  ungoverned signal). When the fetched data carries `rating.numVotes` values (the
+  field is governed and only present while granted), the pick **opportunistically
+  upgrades** to the client-side max-voted title. Both rules read data the list
+  query already fetched — never an extra GraphQL or OMDb request. The degradation
+  is **silent**: cards never render the restricted-field treatment (DES-8 § where
+  it deliberately doesn't apply) — `numVotes` here is a heuristic input, not a
+  displayed fact, so denied → first-entry pick, granted → possibly a better poster
+  on the next fresh fetch, and the user is never told about either. (The
+  feasibility verdict came back **yes on all three gates** — see Data needs — so
+  the monogram-everywhere contingency is retired; the monogram remains as every
+  ladder's floor.)
 
 ## Data needs — feasibility gates, all verified
 
@@ -119,6 +128,17 @@ knownForTitles {
   tconst              # → https://img.omdbapi.com/?i=<tconst>&apikey=db1f8efc
   primaryTitle        # FallbackArt tile initials + alt text
   startYear
-  rating { numVotes } # card variant picks the max-voted title client-side
-}
+  rating {
+    averageRating     # ungoverned sibling — keeps `rating` non-empty under strip
+    numVotes          # GOVERNED (denied to everyone today) — selected
+  }                   # optimistically per architecture § Field-level governance;
+}                     # stripped when denied, present when granted. The card pick
+                      # upgrades to max-voted only when values are present; the
+                      # mosaic and the first-entry pick never read it.
 ```
+
+**Governance note:** `Rating.numVotes` stays in the selection deliberately — the
+optimistic full document is the grant-detection mechanism (the client strips and
+retries while denied; a grant flows through on the next fresh fetch, no code
+change). No treatment, no error, and no extra image traffic in either direction:
+denial changes at most *which* single poster a card shows.
