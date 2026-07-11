@@ -1,12 +1,12 @@
 ---
 id: IMDB-5
 title: Universal search box with autocomplete and poster-rich results
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-2-universal-search.md
 depends-on: [IMDB-4]
 branch: "imdb-5-universal-search"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/14"
 ---
 
 ## Description
@@ -101,3 +101,40 @@ where selecting a result navigates — coordinate with the architect.
   IMDB-14 lights it up with no component change. New GraphQL code goes in NEW
   files (`searchQueries.js`, `searchHooks.js`) — existing `src/graphql/` files
   untouched, IMDB-14 owns them this round.
+- **developer** — implemented → `in-review`, PR #14 (draft):
+  https://github.com/dperez4787/imdb-browser/pull/14.
+  - **What changed:** new `src/search/` (Omnibox, AutocompletePanel,
+    SearchHitRow, SearchFreshness, mergeRows, HomePage, SearchPage), new
+    shared `src/PosterImage.jsx` + `src/FallbackArt.jsx` (DES-1 units, beside
+    the existing Monogram), new `src/graphql/searchQueries.js` +
+    `searchHooks.js` (debounce 250ms, ≥2-char trigger, one aliased request
+    per settled burst, searchInfo riding along), routing scaffold
+    (react-router v7: BrowserRouter in `main.jsx`, route table in `App.jsx`
+    with placeholder `/title/:tconst`, `/person/:nconst`, `/search?q=`,
+    catch-all), TopBar now mounts the compact omnibox off-home, styles
+    appended as one delimited section in `styles.css`.
+  - **IMDB-13 note:** DES-2 folds the freshness indicator in here —
+    `SearchFreshness` (exported standalone for DES-3 reuse) renders
+    `rebuiltAt` relative/absolute, the never-built state, and the
+    absence-over-guessing rule. IMDB-13 likely closes with this PR; PO and
+    tester decide.
+  - **Verified:** all 157 frontend tests + build green; live router run with
+    a gcloud identity token using the exact shipped document — 200, union
+    hits interleaving Title/Name in server order (`coppola`), mid-word
+    `godf` → empty union + prefix fill (Appendix A is a real scenario);
+    OMDb poster URLs for returned tconsts → 200 image/jpeg, bogus id → 404
+    (FallbackArt path); dev server + deep links serve.
+  - **Not verified (needs a human):** the signed-in browser flow end-to-end
+    (Google popup → typing → panel → navigate) — my live auth was a gcloud
+    OIDC token (the router's second JWKS provider), not a Firebase ID token;
+    panel rendering with real posters not eyeballed in a browser; mobile
+    (<720px) overlay exercised only in jsdom.
+  - **Honest notes:** (1) the search document omits `numVotes` (see claim
+    entry) — votes render opportunistically when the field returns under
+    IMDB-14; (2) Enter with no openable rows navigates to the reserved
+    `/search?q=` placeholder — DES-2 leaves that surface undesigned, so this
+    is scaffold wiring, not designed UX; (3) the IMDB-2 tester suite needed a
+    mechanical providers wrapper (App now requires router/query context that
+    `main.jsx` supplies in production) — zero assertion changes; (4) the old
+    `.home-placeholder` CSS block is now unused but was left in place per the
+    append-only styles rule this round.
