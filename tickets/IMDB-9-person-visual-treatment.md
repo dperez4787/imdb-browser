@@ -1,7 +1,7 @@
 ---
 id: IMDB-9
 title: Person visual treatment — known-for poster mosaic vs placeholder
-status: needs-design
+status: ready-for-dev
 owner: product-owner
 design: designs/DES-6-person-visual-treatment.md
 depends-on: [IMDB-5, IMDB-8, IMDB-14]
@@ -89,3 +89,15 @@ IMDB-5 and IMDB-8.
   a card query must never fail on a governed field). The mosaic (page header) and
   monogram floor are unaffected. Amended now, pre-implementation, because changing an
   unstarted ticket is cheaper than a follow-up ticket against shipped code.
+- **ui-ux-designer** — DES-6 revised for governance; back to `ready-for-dev`. The
+  card-variant poster pick is now denial-safe by construction: primary rule is the
+  **first `knownForTitles` entry** (dataset order — IMDb's own curation, an
+  ungoverned signal); when fetched data carries `numVotes` values (field granted),
+  the pick **opportunistically upgrades** to the client-side max-voted title. Both
+  rules read already-fetched data — no extra GraphQL or OMDb requests, and the
+  degradation is **silent**: cards never render the restricted-field treatment
+  (settled in architecture § Person visuals and recorded in DES-8's "where it
+  deliberately doesn't apply"). The snippet keeps `numVotes` optimistically per
+  architecture § Field-level governance and now co-selects `averageRating` so a
+  strip never empties `rating`. Mosaic (known-for order) and monogram floor
+  untouched.
