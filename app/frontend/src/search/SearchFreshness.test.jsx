@@ -48,4 +48,14 @@ describe('SearchFreshness', () => {
     expect(screen.getByText('Index rebuilt 3 h ago')).toBeInTheDocument();
     expect(screen.getByText('ⓘ')).toHaveAttribute('title', rebuiltAt);
   });
+
+  it('the info mark is decorative — no phantom tab stop, no role-less aria-label (DES-2: title is sufficient)', () => {
+    const rebuiltAt = new Date().toISOString();
+    render(<SearchFreshness searchInfo={{ rebuiltAt }} />);
+    const mark = screen.getByText('ⓘ');
+    expect(mark).not.toHaveAttribute('tabindex');
+    expect(mark).not.toHaveAttribute('aria-label');
+    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    expect(mark).toHaveAttribute('title'); // the pointer affordance stays
+  });
 });

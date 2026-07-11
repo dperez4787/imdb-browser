@@ -36,7 +36,13 @@ export default function SearchFreshness({ searchInfo }) {
   return (
     <div className="search-freshness">
       <span>{text}</span>
-      <span className="search-freshness__info" tabIndex={0} title={absolute} aria-label={absolute}>
+      {/* Decorative pointer affordance, per DES-2: "(title attribute is
+          sufficient)". Deliberately NOT focusable and no aria-label: the
+          combobox closes the panel on Tab, so keyboard focus could never
+          reach a tab stop in here anyway — a focusable role-less span would
+          be a phantom stop wherever SearchFreshness is reused (DES-3). The
+          visible text line is the accessible content. */}
+      <span className="search-freshness__info" title={absolute} aria-hidden="true">
         ⓘ
       </span>
     </div>

@@ -1,9 +1,10 @@
 /**
  * Universal-search operation document (IMDB-5, DES-2 "Data needs").
  *
- * NEW file by design: this round IMDB-14 owns the pre-existing src/graphql/
- * files, so IMDB-5's additions live here and in searchHooks.js. Components
- * never import this file — they use useUniversalSearch from searchHooks.js.
+ * NEW file by design: the round this shipped, IMDB-14 owned the pre-existing
+ * src/graphql/ files, so IMDB-5's additions live here and in searchHooks.js.
+ * Components never import this file — they use useUniversalSearch from
+ * searchHooks.js.
  *
  * One document, three aliases, ONE router request per settled keystroke burst:
  *   - hits:   the unified `search` union (PRIMARY — server-ranked, the client
@@ -13,14 +14,22 @@
  *             IMDB-13) — no extra round trip, and it can never be fresher
  *             than the results beside it.
  *
- * GOVERNANCE (per the product-owner advisory on the IMDB-5 ticket, 2026-07-10):
- * `Rating.numVotes` is denied to everyone and selecting it 403s the WHOLE
- * operation; the optimistic select + strip-and-retry mechanism is IMDB-14's
- * work and does not exist yet, so this document deliberately does NOT select
- * numVotes. The row UI renders the votes parenthetical opportunistically
- * whenever a response carries `rating.numVotes`, so once IMDB-14's
- * strip-and-retry lands, re-adding the field here lights vote counts up with
- * no component change.
+ * GOVERNANCE (IMDB-14 / docs/architecture.md § Field-level governance):
+ * `Rating.numVotes` is a governed coordinate (denied to everyone at policy
+ * rev 8), and this document selects it OPTIMISTICALLY anyway — the router's
+ * transparent redact mode answers HTTP 200 with the denied field silently
+ * absent from `data` and the coordinate listed in
+ * `extensions.governance.redactedFields`, at zero extra round trips. The
+ * hook resolves `{ data, deniedFields }` through executeWithDenials, so a
+ * live grant flip lights the votes parenthetical up on the next settled
+ * keystroke (denial-scoped 60 s staleTime) with NO code change; while denied,
+ * the value simply drops out of the row like any missing field (the
+ * parenthetical is opportunistic — DES-2 forbids the restricted treatment in
+ * this transient list). `averageRating` is co-selected beside it per the
+ * document-style rule. An earlier revision of this file omitted numVotes
+ * because the router then REJECTED the whole operation with a 403; that
+ * enforcement shape is retired to a config fallback that errors.js still
+ * normalizes defensively (kind 'denied').
  */
 import { gql } from 'graphql-request';
 
@@ -35,6 +44,7 @@ export const UNIVERSAL_SEARCH_QUERY = gql`
         titleType
         rating {
           averageRating
+          numVotes
         }
       }
       ... on Name {
@@ -51,6 +61,7 @@ export const UNIVERSAL_SEARCH_QUERY = gql`
         titleType
         rating {
           averageRating
+          numVotes
         }
       }
     }

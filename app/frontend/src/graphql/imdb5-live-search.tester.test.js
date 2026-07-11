@@ -11,8 +11,11 @@
  * JWKS providers; the Firebase-ID-token browser path stays not-verified here):
  *
  *   - a multi-entity query returns union hits interleaving Title and Name in
- *     server order, and the document does not 403 (numVotes omitted per the
- *     governance advisory);
+ *     server order, and the document does not 403 ([IMDB-5 fix round] the
+ *     document now selects the governed numVotes OPTIMISTICALLY — the
+ *     router's transparent redact mode answers 200 with the field silently
+ *     absent; the redaction contract itself is covered live by
+ *     imdb5-live-redaction.test.jsx);
  *   - a mid-word query returns zero union hits but non-empty prefix fill —
  *     Appendix A is a real scenario, not a hypothetical;
  *   - searchInfo.rebuiltAt rides along non-null (folded IMDB-13).

@@ -4,8 +4,14 @@
  * Deliberately different seam from the developer's Omnibox.test.jsx (which
  * fakes useUniversalSearch): here the REAL hook, REAL debounce, REAL
  * QueryClient, and REAL mergeRows run end-to-end with only the transport
- * (client.js#execute) faked — so a wiring break between Omnibox and the
- * data layer cannot hide behind a mocked hook. Real timers throughout.
+ * faked — so a wiring break between Omnibox and the data layer cannot hide
+ * behind a mocked hook. Real timers throughout.
+ *
+ * [IMDB-5 fix round] MECHANICAL seam migration, zero assertion changes: the
+ * hook now goes through the denial-aware client path (IMDB-14 redact-mode
+ * contract), so the faked transport is client.js#executeWithDenials and every
+ * stubbed resolution is the `{ data, deniedFields }` envelope (env() below).
+ * The local name stays `execute` to keep the diff reviewable.
  *
  * Also: hostile-input cases for Appendix A's fill rule that the developer's
  * mergeRows.test.js does not cover (union-only overflow, duplicates inside
@@ -18,15 +24,19 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { execute } from '../graphql/client.js';
+import { executeWithDenials as execute } from '../graphql/client.js';
 import { createQueryClient } from '../graphql/queryClient.js';
 import { AUTOCOMPLETE_DEBOUNCE_MS } from '../graphql/searchHooks.js';
 import { UNIVERSAL_SEARCH_QUERY } from '../graphql/searchQueries.js';
 import { assembleRows } from './mergeRows.js';
 import Omnibox from './Omnibox.jsx';
 import SearchPage from './SearchPage.jsx';
+import { setSearchText } from './searchTextStore.js';
 
-vi.mock('../graphql/client.js', () => ({ execute: vi.fn() }));
+vi.mock('../graphql/client.js', () => ({ executeWithDenials: vi.fn() }));
+
+/** The redact-mode envelope the denial-aware transport resolves. */
+const env = (data) => ({ data, deniedFields: [] });
 
 const REBUILT = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
 
@@ -97,7 +107,9 @@ const options = () => screen.getAllByRole('option');
 
 beforeEach(() => {
   vi.clearAllMocks();
-  execute.mockResolvedValue(payload());
+  execute.mockResolvedValue(env(payload()));
+  // The lifted query-text store survives unmounts by design — reset it.
+  setSearchText('');
 });
 
 describe('debounce through the real hook (AC: one request per settled burst)', () => {
@@ -144,7 +156,7 @@ describe('panel pipeline: skeleton → union rows (posters/monograms) → footer
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(screen.queryByText(/Index rebuilt/)).toBeNull();
 
-    await act(async () => d.resolve(UNION_DATA));
+    await act(async () => d.resolve(env(UNION_DATA)));
 
     const rows = await waitFor(() => options());
     expect(rows.map((r) => r.textContent)).toEqual([
@@ -175,10 +187,12 @@ describe('panel pipeline: skeleton → union rows (posters/monograms) → footer
 
   it('empty union + prefix fill renders Appendix A order through the real pipeline', async () => {
     execute.mockResolvedValue(
-      payload({
-        titles: [title(11), title(12), title(13)],
-        people: [person(21), person(22)],
-      }),
+      env(
+        payload({
+          titles: [title(11), title(12), title(13)],
+          people: [person(21), person(22)],
+        }),
+      ),
     );
     renderBox();
     typeText('godf');
@@ -195,7 +209,7 @@ describe('panel pipeline: skeleton → union rows (posters/monograms) → footer
 
   it('query change keeps previous rows at full strength and shows the progress bar', async () => {
     const { container } = renderBox();
-    execute.mockResolvedValueOnce(UNION_DATA);
+    execute.mockResolvedValueOnce(env(UNION_DATA));
     typeText('coppola');
     await waitFor(() => expect(options()).toHaveLength(4));
 
@@ -207,14 +221,14 @@ describe('panel pipeline: skeleton → union rows (posters/monograms) → footer
     );
     // Previous rows still there, still a real listbox (not skeletons).
     expect(options()).toHaveLength(4);
-    await act(async () => d.resolve(payload({ hits: [uT(9, { primaryTitle: 'Fresh Row' })] })));
+    await act(async () => d.resolve(env(payload({ hits: [uT(9, { primaryTitle: 'Fresh Row' })] }))));
     await waitFor(() => expect(options()).toHaveLength(1));
   });
 });
 
 describe('DES-2 keyboard model against the real pipeline', () => {
   async function openWithUnionData() {
-    execute.mockResolvedValue(UNION_DATA);
+    execute.mockResolvedValue(env(UNION_DATA));
     renderBox();
     input().focus();
     typeText('coppola');
@@ -249,7 +263,7 @@ describe('DES-2 keyboard model against the real pipeline', () => {
     key('ArrowDown');
     expect(options()[2]).toHaveAttribute('aria-selected', 'true');
 
-    execute.mockResolvedValue(payload({ hits: [uT(31), uN(32), uT(33)] }));
+    execute.mockResolvedValue(env(payload({ hits: [uT(31), uN(32), uT(33)] })));
     typeText('coppola j');
     await waitFor(() => expect(options()).toHaveLength(3));
     expect(options()[0]).toHaveAttribute('aria-selected', 'true');
@@ -279,7 +293,7 @@ describe('DES-2 keyboard model against the real pipeline', () => {
   });
 
   it('`/` does NOT steal focus from another text field', async () => {
-    execute.mockResolvedValue(UNION_DATA);
+    execute.mockResolvedValue(env(UNION_DATA));
     render(
       <QueryClientProvider client={createQueryClient()}>
         <MemoryRouter>
@@ -297,7 +311,7 @@ describe('DES-2 keyboard model against the real pipeline', () => {
 
 describe('DES-2 empty/error states through the real pipeline', () => {
   it('no results: query-blaming copy + freshness footer', async () => {
-    execute.mockResolvedValue(payload());
+    execute.mockResolvedValue(env(payload()));
     renderBox();
     typeText('zzyzx');
     await waitFor(() => expect(screen.getByText('Nothing matches “zzyzx”.')).toBeInTheDocument());
@@ -306,7 +320,7 @@ describe('DES-2 empty/error states through the real pipeline', () => {
   });
 
   it('index never built (rebuiltAt null): honest copy + "Index not yet built" footer', async () => {
-    execute.mockResolvedValue(payload({ rebuiltAt: null }));
+    execute.mockResolvedValue(env(payload({ rebuiltAt: null })));
     renderBox();
     typeText('godf');
     await waitFor(() => expect(screen.getByText(/hasn’t been built yet/)).toBeInTheDocument());
@@ -324,7 +338,7 @@ describe('DES-2 empty/error states through the real pipeline', () => {
     expect(screen.queryByText(/Index rebuilt/)).toBeNull();
 
     const callsBefore = execute.mock.calls.length;
-    execute.mockResolvedValue(UNION_DATA);
+    execute.mockResolvedValue(env(UNION_DATA));
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(execute.mock.calls.length).toBeGreaterThan(callsBefore));
     await waitFor(() => expect(options()).toHaveLength(4));

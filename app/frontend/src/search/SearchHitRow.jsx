@@ -33,9 +33,13 @@ export function titleTypeLabel(titleType) {
   return TITLE_TYPE_LABELS[titleType] ?? titleType.charAt(0).toUpperCase() + titleType.slice(1);
 }
 
-/** 2145672 → "2.1M", 34120 → "34K" (DES-2's compact votes parenthetical). */
+/**
+ * 2145672 → "2.1M", 34120 → "34K" (DES-2's compact votes parenthetical).
+ * The M branch starts at 999,500 — anything that would ROUND to 1000K must
+ * render as "1M", not "1000K" (999,600 / 1000 rounds to 1000).
+ */
 export function compactVotes(count) {
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (count >= 999_500) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
   if (count >= 1_000) return `${Math.round(count / 1_000)}K`;
   return String(count);
 }

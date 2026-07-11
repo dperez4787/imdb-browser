@@ -3,11 +3,23 @@
 // does not design that surface, so this stays a minimal placeholder; the
 // union field (limit up to 50) is its ready-made data path when a follow-up
 // spec picks it up.
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router';
+
+import { setSearchText } from './searchTextStore.js';
 
 export default function SearchPage() {
   const [params] = useSearchParams();
   const q = params.get('q') ?? '';
+
+  // This is the one route where the URL's q is authoritative for the omnibox
+  // text: a deep link (or back/forward between /search URLs) hydrates the
+  // shared store so the TopBar omnibox shows the query it represents. An
+  // empty/absent q clobbers nothing — typing in the omnibox is not URL state
+  // until Enter commits it.
+  useEffect(() => {
+    if (q) setSearchText(q);
+  }, [q]);
 
   return (
     <section className="route-placeholder">

@@ -5,11 +5,13 @@
  * detail routes. The GraphQL layer is faked at its seam (useUniversalSearch);
  * row assembly (mergeRows) runs for real.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Omnibox from './Omnibox.jsx';
+import SearchPage from './SearchPage.jsx';
+import { setSearchText } from './searchTextStore.js';
 import { useUniversalSearch } from '../graphql/searchHooks.js';
 
 vi.mock('../graphql/searchHooks.js', () => ({
@@ -90,6 +92,14 @@ const key = (k, opts = {}) => fireEvent.keyDown(input(), { key: k, ...opts });
 beforeEach(() => {
   vi.clearAllMocks();
   useUniversalSearch.mockReturnValue(searchState());
+  // The query text lives in a module-level store (survives unmounts by
+  // design) — reset it so tests stay independent.
+  setSearchText('');
+});
+
+afterEach(() => {
+  // jsdom has no matchMedia; tests that need a viewport stub set it.
+  delete window.matchMedia;
 });
 
 describe('open/close', () => {
@@ -298,5 +308,170 @@ describe('panel states (DES-2)', () => {
     expect(screen.queryByText(/Index rebuilt/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new query fetching after a previous EMPTY result shows loading, never "Nothing matches"', () => {
+    // rows empty + a fetch in flight: the empty data belongs to the previous
+    // query; blaming the new one would be a false no-results.
+    useUniversalSearch.mockReturnValue(
+      searchState({
+        data: { hits: [], titles: { items: [] }, people: { items: [] }, searchInfo: { rebuiltAt: REBUILT } },
+        isFetching: true,
+        debouncedQuery: 'zzyzxy',
+      }),
+    );
+    renderOmnibox();
+    type('zzyzxy');
+    expect(screen.queryByText(/Nothing matches/)).toBeNull();
+    expect(screen.getByRole('status', { name: 'Searching' })).toBeInTheDocument();
+  });
+
+  it('the settled no-results body is a polite live region (role=status)', () => {
+    useUniversalSearch.mockReturnValue(
+      searchState({
+        data: { hits: [], titles: { items: [] }, people: { items: [] }, searchInfo: { rebuiltAt: REBUILT } },
+        debouncedQuery: 'zzyzx',
+      }),
+    );
+    const { container } = renderOmnibox();
+    type('zzyzx');
+    const panel = container.querySelector('.autocomplete-panel');
+    expect(within(panel).getByRole('status')).toHaveTextContent('Nothing matches “zzyzx”.');
+  });
+});
+
+describe('ARIA wiring (no dangling references, entity-scoped option ids)', () => {
+  it('skeleton state: collapsed combobox, no aria-controls/activedescendant pointing at nothing', () => {
+    useUniversalSearch.mockReturnValue(
+      searchState({ data: undefined, isPending: true, isFetching: true }),
+    );
+    renderOmnibox();
+    type('godf');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(input()).toHaveAttribute('aria-expanded', 'false');
+    expect(input()).not.toHaveAttribute('aria-controls');
+    expect(input()).not.toHaveAttribute('aria-activedescendant');
+  });
+
+  it('error state: same — the alert body is not a listbox', () => {
+    useUniversalSearch.mockReturnValue(
+      searchState({ data: undefined, error: { kind: 'network', message: 'boom' } }),
+    );
+    renderOmnibox();
+    type('godf');
+    expect(input()).toHaveAttribute('aria-expanded', 'false');
+    expect(input()).not.toHaveAttribute('aria-controls');
+  });
+
+  it('with rows: aria-controls references the rendered listbox element', () => {
+    renderOmnibox();
+    type('godf');
+    expect(input()).toHaveAttribute('aria-expanded', 'true');
+    expect(input()).toHaveAttribute('aria-controls', screen.getByRole('listbox').id);
+  });
+
+  it('option ids embed the entity id, so the active descendant differs across result sets', () => {
+    renderOmnibox();
+    type('godf');
+    expect(input().getAttribute('aria-activedescendant')).toContain('tt0068646');
+
+    // Same index, different entity → textually different id (screen readers
+    // re-announce; index-based ids would be identical and stay silent).
+    useUniversalSearch.mockReturnValue(
+      searchState({
+        data: {
+          ...DATA,
+          hits: [{ ...DATA.hits[0], tconst: 'tt9999999', primaryTitle: 'Other' }, DATA.hits[1]],
+        },
+        debouncedQuery: 'other',
+      }),
+    );
+    type('other');
+    expect(input().getAttribute('aria-activedescendant')).toContain('tt9999999');
+  });
+});
+
+describe('query text lifted above the route (DES-2 Back-then-refocus)', () => {
+  it('survives unmount/remount, and refocus with text resumes the panel', () => {
+    const view = renderOmnibox();
+    type('godf');
+    view.unmount();
+
+    renderOmnibox();
+    expect(input()).toHaveValue('godf');
+    expect(screen.queryByRole('listbox')).toBeNull(); // closed until refocus
+    input().focus();
+    fireEvent.focus(input());
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('deep link to /search?q= hydrates the omnibox text from the URL', () => {
+    render(
+      <MemoryRouter initialEntries={['/search?q=the%20godfather']}>
+        <Omnibox variant="compact" />
+        <Routes>
+          <Route path="/search" element={<SearchPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('combobox')).toHaveValue('the godfather');
+  });
+});
+
+describe('mobile overlay (compact, DES-2 "✕/Esc closes it")', () => {
+  const toggle = () => screen.getByRole('button', { name: 'Search' });
+  const overlayClass = (container) => container.querySelector('.omnibox').className;
+
+  it('the close control exists even with an EMPTY input, closes the overlay, and returns focus to the toggle', () => {
+    const { container } = renderOmnibox({ variant: 'compact' });
+    fireEvent.click(toggle());
+    expect(overlayClass(container)).toContain('omnibox--mobile-open');
+
+    const close = screen.getByRole('button', { name: 'Close search' });
+    fireEvent.click(close);
+    expect(overlayClass(container)).not.toContain('omnibox--mobile-open');
+    expect(document.activeElement).toBe(toggle()); // not <body>
+  });
+
+  it('✕ with text typed closes the overlay WITHOUT clearing the query (Esc parity)', () => {
+    const { container } = renderOmnibox({ variant: 'compact' });
+    fireEvent.click(toggle());
+    type('godf');
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
+    expect(overlayClass(container)).not.toContain('omnibox--mobile-open');
+    expect(input()).toHaveValue('godf');
+  });
+
+  it('Esc closes the overlay and returns focus to the toggle, not <body>', () => {
+    const { container } = renderOmnibox({ variant: 'compact' });
+    fireEvent.click(toggle());
+    key('Escape');
+    expect(overlayClass(container)).not.toContain('omnibox--mobile-open');
+    expect(document.activeElement).toBe(toggle());
+  });
+
+  it('`/` at mobile width opens the overlay first, then focuses after the paint (rAF)', async () => {
+    window.matchMedia = vi.fn(() => ({ matches: true }));
+    const { container } = renderOmnibox({ variant: 'compact' });
+    fireEvent.keyDown(document.body, { key: '/' });
+    // Overlay opens synchronously; focus lands on the next frame, once the
+    // field is no longer display:none.
+    expect(overlayClass(container)).toContain('omnibox--mobile-open');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(document.activeElement).toBe(input());
+  });
+
+  it('`/` at desktop width never touches the overlay state — the two-Esc model stays intact', () => {
+    window.matchMedia = vi.fn(() => ({ matches: false }));
+    const { container } = renderOmnibox({ variant: 'compact' });
+    fireEvent.keyDown(document.body, { key: '/' });
+    expect(document.activeElement).toBe(input());
+    expect(overlayClass(container)).not.toContain('omnibox--mobile-open');
+
+    type('godf');
+    key('Escape'); // 1: closes the panel
+    expect(screen.queryByRole('listbox')).toBeNull();
+    key('Escape'); // 2: blurs — no phantom overlay state eating an Esc
+    expect(document.activeElement).not.toBe(input());
   });
 });

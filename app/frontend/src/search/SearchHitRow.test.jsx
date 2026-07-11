@@ -66,6 +66,14 @@ describe('labels and formats', () => {
     expect(compactVotes(950)).toBe('950');
   });
 
+  it('never renders "1000K": anything that would round to 1000K is the M branch', () => {
+    expect(compactVotes(999_600)).toBe('1M');
+    expect(compactVotes(999_500)).toBe('1M');
+    expect(compactVotes(999_499)).toBe('999K');
+    expect(compactVotes(1_000_000)).toBe('1M');
+    expect(compactVotes(1_050_000)).toBe('1.1M');
+  });
+
   it('prettifies professions, caps at 3, falls back to "Person"', () => {
     expect(professionsLine(['actor', 'casting_director'])).toBe('Actor · Casting Director');
     expect(professionsLine(['a', 'b', 'c', 'd'].map(() => 'actor')).split('·')).toHaveLength(3);
