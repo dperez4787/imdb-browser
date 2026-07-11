@@ -1,12 +1,12 @@
 ---
 id: IMDB-17
 title: Governance role badge — show who the graph thinks you are
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-2, IMDB-4]
 branch: imdb-17-governance-role-badge
-pr: ""
+pr: https://github.com/dperez4787/imdb-browser/pull/20
 ---
 
 ## Description
@@ -119,3 +119,19 @@ headers are the supported mechanism today.
   `src/RoleBadge.jsx` (+test), `src/UserMenu.jsx` (+tests), `src/styles.css`.
   No other view touched; the roles-present *live* path is seam-tested only and
   deferred per the user directive (the verifying identity maps to no persona).
+- **developer** — **in-review**, draft PR #20. `npm ci && npm test &&
+  npm run build` all green (359 passed, 17 skipped — the live/hermetic set).
+  Colocated tests: `rolesStore.test.js` (transitions: present / absent /
+  changing / revision / reset / plain-object headers), `RoleBadge.test.jsx`
+  (all four states incl. dashed `no data role` + `data-roles`), and
+  `UserMenu.test.jsx` additions (badge in the single trigger, accessible-name
+  suffix, and the Data roles section). **LIVE** via
+  `LIVE_ROUTER_TOKEN="$(gcloud auth print-identity-token)"`
+  (`rolesStore.live.integration.test.js`): the real client surfaced the
+  no-roles state — `X-Imdb-Roles` absent, `x-imdb-policy-revision: 8` present
+  (both CORS-exposed) — so the store landed on `roles: []`, `revision: 8` and
+  the badge renders **"no data role"** / menu **"policy rev 8"**, exactly the
+  DES-1 no-roles spec. **Not verified live:** the roles-PRESENT path — the
+  gcloud identity maps to no persona so the header is correctly omitted;
+  deferred per the user directive and left to seam tests. Draft left for the
+  tester; not marked ready.
