@@ -1,12 +1,12 @@
 ---
 id: IMDB-2
 title: Firebase Auth with Google-only sign-in behind an AuthGate
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-1]
 branch: "imdb-2-firebase-auth-authgate"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/6"
 ---
 
 ## Description
@@ -59,3 +59,21 @@ signed-in user indicator + sign-out affordance in the app shell.
   borrow from linear-example. Note: the ticket's file list says `firebase-config.js`;
   architecture.md and linear-example both name it `src/firebase.js` — going with
   `firebase.js`.
+- **developer** — implemented; PR https://github.com/dperez4787/imdb-browser/pull/6
+  (draft). New: `src/auth.js` (lazy init, subscribeToAuth / signInWithGoogle /
+  signOutUser / getIdToken), `src/firebase.js` (committed public config of the new
+  Web App), `AuthContext.jsx`, `AuthGate.jsx`, `AuthCurtain.jsx`, `SignInScreen.jsx`,
+  `AppShell.jsx`, `TopBar.jsx`, `UserMenu.jsx`, `Monogram.jsx`, `Wordmark.jsx`,
+  `styles.css`, + colocated tests. Changed: `App.jsx` (composition root),
+  `main.jsx`/`main.test.jsx`, `App.test.jsx`, `setupTests.js` (explicit RTL cleanup —
+  vitest has no globals so auto-cleanup never armed), and
+  `scaffold-conventions.test.js`: IMDB-1's "no Firebase anywhere" check is now "no
+  Firebase outside auth.js/firebase.js", which enforces this ticket's boundary AC;
+  flagging the loosening here since that test is tester-owned coverage. Verified:
+  `npm ci && npm test` 34/34 green, `npm run build` clean, dev server serves; an
+  uncommitted jsdom smoke booted the app against the real Firebase SDK (no mocks)
+  and it resolved signed-out to the sign-in screen. NOT verified (needs a real
+  browser): the live Google popup flow — sign-in, reload persistence, sign-out —
+  and DES-1's visual/responsive polish; left for the tester. TopBar ships without
+  the chat toggle (DES-7/IMDB-11) and with an empty omnibox slot (DES-2/IMDB-5), by
+  design.
