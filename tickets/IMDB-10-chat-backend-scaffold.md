@@ -1,11 +1,11 @@
 ---
 id: IMDB-10
 title: Chat backend scaffold — Anthropic agentic loop with GraphQL MCP on Cloud Run
-status: in-progress
+status: in-review
 owner: product-owner
 depends-on: []
 branch: "imdb-10-chat-backend-scaffold"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/5"
 ---
 
 ## Description
@@ -72,3 +72,23 @@ dedicated modules per CLAUDE.md.
   before search-dependent questions return data.
 - **developer** — claimed. Branch `imdb-10-chat-backend-scaffold`. Implementing per
   the "Chat backend API contract" section of `docs/architecture.md`.
+- **developer** — implemented → `in-review`, draft PR
+  https://github.com/dperez4787/imdb-browser/pull/5. `app/chat/`: Express app with
+  thin handlers (`src/app.js`), injected seams for auth (`auth.js`), validation
+  (`validate.js`), rate limit (`ratelimit.js`), SSE framing (`sse.js`), Anthropic
+  loop (`anthropic.js`, claude-opus-4-8 / streaming / max_tokens 2048 / 8-iteration
+  cap), and per-request stdio spawn of `mcp-graphql` 2.0.4 (`mcp.js`) pointed at the
+  cosmo router with the requester's forwarded Firebase ID token. Architect's open
+  assumption resolved: mcp-graphql v2 config is env vars `ENDPOINT`/`HEADERS`/
+  `ALLOW_MUTATIONS`/`NAME` (confirmed against the installed package). Dockerfile
+  mirrors linear-example's backend. Verified: 23/23 tests green (`npm test`,
+  Anthropic/MCP/firebase-admin faked at the seams — zero token spend); live boot
+  with no credentials → /health 200, unauthenticated and forged-token /api/chat →
+  401 with no ANTHROPIC_API_KEY even present; real mcp-graphql child spawned and
+  ran a real query against the live router (401/unauthorized with a fake token, as
+  expected — Authorization forwarding proven up to the router's gate); docker build
+  + in-container /health 200 and 401 smoke test. NOT verified: the full
+  authenticated conversation (real ANTHROPIC_API_KEY + real Firebase ID token →
+  streamed answer from live GraphQL) — needs secrets only the tester/user has;
+  that is the remaining acceptance criterion to exercise. Search-dependent
+  questions also still need the user to run imdb-federation `./scripts/rebuild.sh`.
