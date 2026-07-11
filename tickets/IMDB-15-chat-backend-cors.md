@@ -1,11 +1,11 @@
 ---
 id: IMDB-15
 title: Chat backend CORS headers so browsers can call /api/chat cross-origin
-status: in-progress
+status: in-review
 owner: product-owner
 depends-on: []
 branch: "imdb-15-chat-backend-cors"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/11"
 ---
 
 ## Description
@@ -69,3 +69,17 @@ is the recorded default; note any deviation in the Log and in
   the router precedent, OPTIONS short-circuited to 204 before auth, no
   `Allow-Credentials` ever; colocated `node:test` coverage plus a credential-less
   boot + curl verification.
+- **developer** — implemented, PR #11 (draft). Files: `app/chat/src/cors.js` (new
+  middleware module, wildcard allow-origin per the router precedent, OPTIONS → 204
+  before body parsing and auth, `Allow-Headers: Authorization, Content-Type`, no
+  `Allow-Credentials` ever), `app/chat/src/app.js` (mounts `cors()` first),
+  `app/chat/src/cors.test.js` (4 tests: preflight shape + verifier never called,
+  forged-token cross-origin POST → 401 with allow-origin, SSE response carries
+  allow-origin, /health unregressed; each also asserts no credentials header).
+  Verified: `npm ci && npm test` 36/36 green; server booted credential-less and
+  curled live — OPTIONS preflight 204 with all required headers, forged-token POST
+  401 with `Access-Control-Allow-Origin: *`, /health 200 `{"status":"ok"}`.
+  NOT verified (honestly): the human/live criterion — a signed-in browser session
+  at `http://localhost:5173` completing a streamed chat round-trip. The SSE
+  allow-origin path is proven only by the supertest test with injected
+  verifier/agent fakes, not against live Firebase/Anthropic. For the tester.
