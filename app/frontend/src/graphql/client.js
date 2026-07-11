@@ -29,16 +29,17 @@
  * normalizing it to kind 'denied' defensively, but it is no longer the
  * primary path and no retry machinery hangs off it.
  *
- * NOTE: docs/architecture.md § Field-level governance still describes the
- * old strip-and-retry contract; an architect amendment is pending (flagged
- * on the IMDB-14 ticket/PR).
+ * docs/architecture.md § Field-level governance is the source of truth for
+ * this contract: it documents transparent redact mode as the primary path
+ * (amended by the architect via PR #12) and explicitly retires the earlier
+ * strip-and-retry mechanism.
  *
  * Components never import this file — they use the hooks/keys in hooks.js.
  */
 import { GraphQLClient } from 'graphql-request';
 
 import { getIdToken } from '../auth.js';
-import { normalizeError, signedOutError } from './errors.js';
+import { GraphQLLayerError, normalizeError, signedOutError, tokenFetchError } from './errors.js';
 
 const DEFAULT_ROUTER_URL = 'https://cosmo-router-dkuqnmldta-uc.a.run.app/graphql';
 
@@ -58,7 +59,15 @@ export function routerUrl() {
  * @returns {Promise<{data: object, extensions: object|undefined}>}
  */
 async function rawExecute(document, variables) {
-  const token = await getIdToken();
+  // A rejected token fetch must surface as the normalized 'auth' kind like
+  // every other failure — not escape as a raw exception, and not fall through
+  // normalizeError's transport branch as a bogus 'network'.
+  let token;
+  try {
+    token = await getIdToken();
+  } catch (err) {
+    throw err instanceof GraphQLLayerError ? err : tokenFetchError(err);
+  }
   if (!token) throw signedOutError();
 
   try {

@@ -205,6 +205,41 @@ describe('staleTime wiring (architecture caching policy + denial scoping)', () =
     expect(staleTime({ state: { data: undefined } })).toBe(HOUR);
   });
 
+  // Fix round on PR #13: the caller-options spread let a per-call staleTime
+  // replace the denial-scoped function entirely, silently disabling the 60s
+  // grant-flip freshness. The cap is min(60s, staleTime) whenever the result
+  // reports denials — no caller option can stretch a degraded result past it.
+  it('a caller-supplied staleTime CANNOT stretch a degraded result past the 60s denial cap', async () => {
+    const { queryClient } = await renderQueryHook(() =>
+      useTitle('tt0068646', { staleTime: 24 * HOUR }),
+    );
+    // Degraded → capped at 60s despite the caller's day-long freshness…
+    expect(staleTimeFor(queryClient, degraded)).toBe(DENIED_STALE_TIME);
+    // …clean → the caller's staleTime applies as the normal window.
+    expect(staleTimeFor(queryClient, clean)).toBe(24 * HOUR);
+  });
+
+  it('denial cap is min-of-the-two: a caller wanting FRESHER than 60s keeps it, even degraded', async () => {
+    const { queryClient } = await renderQueryHook(() =>
+      useTitle('tt0068646', { staleTime: 10_000 }),
+    );
+    expect(staleTimeFor(queryClient, degraded)).toBe(10_000);
+    expect(staleTimeFor(queryClient, clean)).toBe(10_000);
+  });
+
+  it('denialScopedStaleTime caps non-numeric and function-form bases when degraded', () => {
+    // Infinity / 'static' / undefined cannot dodge the cap.
+    expect(denialScopedStaleTime(Infinity)({ state: { data: degraded } })).toBe(60_000);
+    expect(denialScopedStaleTime('static')({ state: { data: degraded } })).toBe(60_000);
+    expect(denialScopedStaleTime(undefined)({ state: { data: degraded } })).toBe(60_000);
+    // TanStack v5 function-form base: resolved with the query, then capped.
+    const fnBase = denialScopedStaleTime(() => HOUR);
+    expect(fnBase({ state: { data: degraded } })).toBe(60_000);
+    expect(fnBase({ state: { data: clean } })).toBe(HOUR);
+    // Non-numeric bases pass through untouched for clean results.
+    expect(denialScopedStaleTime('static')({ state: { data: clean } })).toBe('static');
+  });
+
   it('staleTimes exports match, so cache plumbing can rely on them', () => {
     expect(staleTimes).toMatchObject({
       searchInfo: HOUR,

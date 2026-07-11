@@ -45,12 +45,22 @@ export const DEFAULT_PAGE_SIZE = 24;
 export const DENIED_STALE_TIME = 60_000;
 
 /**
- * Function-form staleTime: 60 s while the cached envelope reports denied
- * coordinates, the operation's normal staleTime otherwise.
+ * Function-form staleTime: while the cached envelope reports denied
+ * coordinates, the result is fresh for AT MOST 60 s — `min(60s, normal)`, so
+ * a caller-supplied staleTime may shorten the window but can never stretch a
+ * degraded result past the denial cap (a denial cached for the 1 h entity
+ * staleTime would hide a live grant flip for an hour). Clean results get the
+ * normal staleTime untouched. `normalStaleTime` may itself be TanStack v5's
+ * function form; non-numeric forms ('static', undefined) fall back to the
+ * cap when degraded.
  */
 export function denialScopedStaleTime(normalStaleTime) {
-  return (query) =>
-    query.state.data?.deniedFields?.length ? DENIED_STALE_TIME : normalStaleTime;
+  return (query) => {
+    const normal =
+      typeof normalStaleTime === 'function' ? normalStaleTime(query) : normalStaleTime;
+    if (!query.state.data?.deniedFields?.length) return normal;
+    return typeof normal === 'number' ? Math.min(DENIED_STALE_TIME, normal) : DENIED_STALE_TIME;
+  };
 }
 
 /**
@@ -58,14 +68,23 @@ export function denialScopedStaleTime(normalStaleTime) {
  * {data, deniedFields} envelope, staleTime is denial-scoped, and the returned
  * result unwraps the envelope (`data` is the operation data, `deniedFields`
  * is always an array — empty until a fetch reports denials).
+ *
+ * Caller options spread in, but `staleTime` is NOT a straight override: a
+ * caller-supplied staleTime replaces the operation's normal freshness window
+ * and is then denial-scoped like any other — when a result reports denied
+ * coordinates, the 60 s cap wins (min of the two) no matter what the caller
+ * passed. Anything else would let one call site silently disable the
+ * grant-flip freshness guarantee for a shared cache entry.
  */
-function useGraphQuery({ queryKey, document, variables, staleTime, enabled = true }, options) {
+function useGraphQuery({ queryKey, document, variables, staleTime, enabled = true }, options = {}) {
+  const { staleTime: callerStaleTime, ...callerOptions } = options;
   const query = useQuery({
     queryKey,
     queryFn: () => executeWithDenials(document, variables),
-    staleTime: denialScopedStaleTime(staleTime),
     enabled,
-    ...options,
+    ...callerOptions,
+    // After the spread, so no option object can bypass the denial cap.
+    staleTime: denialScopedStaleTime(callerStaleTime ?? staleTime),
   });
   return {
     ...query,

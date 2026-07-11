@@ -75,6 +75,21 @@ export function signedOutError() {
 }
 
 /**
+ * A rejected credential fetch (auth.js#getIdToken() threw — e.g. Firebase
+ * token refresh failed). Like the signed-out guard, this happens BEFORE any
+ * network request to the router, and it is a credential problem, not a router
+ * transport one — so it is kind 'auth', never 'network', and never a raw
+ * exception escaping the client layer's normalized shape.
+ */
+export function tokenFetchError(err) {
+  const cause = err?.message ? `: ${err.message}` : '.';
+  return new GraphQLLayerError(
+    'auth',
+    `Could not obtain a sign-in credential — no request was sent to the router${cause}`,
+  );
+}
+
+/**
  * Normalize anything thrown by the transport (graphql-request's ClientError,
  * a fetch TypeError, an abort, …) into a GraphQLLayerError. Idempotent:
  * already-normalized errors pass through untouched.

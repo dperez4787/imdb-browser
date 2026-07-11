@@ -160,6 +160,96 @@ describe('tooltip (the explaining affordance — hover AND keyboard focus)', () 
     expect(tooltipOf(container)).toBeNull();
   });
 
+  // Hover and focus are independent openers (fix round on PR #13): a single
+  // open/closed boolean let mouseleave close a focus-held tooltip and left a
+  // hover-opened tooltip with no Esc path. Open = hover OR focus; Esc closes
+  // both while keeping focus.
+  it('mousing away from a FOCUSED pill does not close the tooltip — focus holds it until blur/Esc', () => {
+    const { container } = render(
+      <RestrictedValue coordinate="Rating.numVotes" label="Vote count" />,
+    );
+    const el = pillOf(container);
+
+    act(() => el.focus());
+    fireEvent.mouseOver(el);
+    expect(tooltipOf(container)).not.toBeNull();
+
+    fireEvent.mouseOut(el); // hover ends, focus remains
+    expect(el).toHaveFocus();
+    expect(tooltipOf(container)).not.toBeNull();
+
+    act(() => el.blur()); // only blur (or Esc) ends the focus-opened affordance
+    expect(tooltipOf(container)).toBeNull();
+  });
+
+  it('unfocusing a HOVERED pill does not close the tooltip — hover holds it until mouseout', () => {
+    const { container } = render(
+      <RestrictedValue coordinate="Rating.numVotes" label="Vote count" />,
+    );
+    const el = pillOf(container);
+
+    fireEvent.mouseOver(el);
+    act(() => el.focus());
+    act(() => el.blur()); // focus ends, hover remains
+    expect(tooltipOf(container)).not.toBeNull();
+
+    fireEvent.mouseOut(el);
+    expect(tooltipOf(container)).toBeNull();
+  });
+
+  it('Esc dismisses a HOVER-opened tooltip (no focus involved)', () => {
+    const { container } = render(
+      <RestrictedValue coordinate="Rating.numVotes" label="Vote count" />,
+    );
+    const el = pillOf(container);
+
+    fireEvent.mouseOver(el);
+    expect(tooltipOf(container)).not.toBeNull();
+    expect(el).not.toHaveFocus(); // keydown can't reach the pill itself
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(tooltipOf(container)).toBeNull();
+
+    // A fresh hover re-expresses intent and re-opens.
+    fireEvent.mouseOut(el);
+    fireEvent.mouseOver(el);
+    expect(tooltipOf(container)).not.toBeNull();
+  });
+
+  it('Esc while hovered AND focused closes the tooltip, keeps focus, and does not reopen until fresh intent', () => {
+    const { container } = render(
+      <RestrictedValue coordinate="Rating.numVotes" label="Vote count" />,
+    );
+    const el = pillOf(container);
+
+    act(() => el.focus());
+    fireEvent.mouseOver(el);
+    fireEvent.keyDown(el, { key: 'Escape' });
+    expect(tooltipOf(container)).toBeNull();
+    expect(el).toHaveFocus(); // Esc never throws focus away
+
+    // Still hovered + focused: the dismissal holds until a fresh opener.
+    fireEvent.mouseOut(el);
+    expect(tooltipOf(container)).toBeNull();
+
+    // Blur then re-focus is fresh intent → the tooltip returns.
+    act(() => el.blur());
+    act(() => el.focus());
+    expect(tooltipOf(container)).not.toBeNull();
+  });
+
+  it('the document-level Esc listener is only attached while the tooltip is open', () => {
+    const { container } = render(
+      <RestrictedValue coordinate="Rating.numVotes" label="Vote count" />,
+    );
+    const el = pillOf(container);
+
+    // Closed tooltip: an unrelated Escape anywhere must not affect a later open.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.mouseOver(el);
+    expect(tooltipOf(container)).not.toBeNull();
+  });
+
   it('Enter/Space do nothing — it is not a button and never navigates', () => {
     const { container } = render(
       <RestrictedValue coordinate="Rating.numVotes" label="Vote count" />,

@@ -19,8 +19,17 @@
  * focus staying on the pill. Screen readers get the visually-hidden text
  * "<Label>: restricted by data governance." — hatch, lock, and tooltip are
  * aria-hidden decoration so nothing announces twice.
+ *
+ * Hover and focus are tracked SEPARATELY (they are independent openers per
+ * DES-8): the tooltip is open while hovered OR focused, so mousing away from
+ * a keyboard-focused pill never steals its tooltip — only blur or Esc ends
+ * the focus-opened affordance. Esc dismisses whichever opener is active
+ * (hover, focus, or both) without moving focus; the dismissal lasts until a
+ * fresh hover or focus re-expresses intent. A hover-opened tooltip has no
+ * focused element to receive the keydown, so Esc is also listened for on the
+ * document — but only while the tooltip is open.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * The two-rule contract's predicate: is this coordinate denied? Call sites
@@ -75,21 +84,44 @@ export default function RestrictedValue({
   variant = 'inline',
   width = '3.5em',
 }) {
-  const [tooltipOpen, setTooltipOpen] = useState(false);
+  // Hover and focus each hold the tooltip open on their own; `dismissed`
+  // (Esc) overrides both until the next hover/focus re-opens it.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const tooltipOpen = (hovered || focused) && !dismissed;
+
+  // Esc must dismiss a hover-opened tooltip too, and an unfocused pill never
+  // receives keydown — so listen on the document, but only while open.
+  useEffect(() => {
+    if (!tooltipOpen) return undefined;
+    const onDocumentKeyDown = (event) => {
+      if (event.key === 'Escape') setDismissed(true);
+    };
+    document.addEventListener('keydown', onDocumentKeyDown);
+    return () => document.removeEventListener('keydown', onDocumentKeyDown);
+  }, [tooltipOpen]);
 
   return (
     <span
       className={`restricted-value restricted-value--${variant}`}
       data-coordinate={coordinate}
       tabIndex={0}
-      onMouseEnter={() => setTooltipOpen(true)}
-      onMouseLeave={() => setTooltipOpen(false)}
-      onFocus={() => setTooltipOpen(true)}
-      onBlur={() => setTooltipOpen(false)}
+      onMouseEnter={() => {
+        setHovered(true);
+        setDismissed(false); // fresh intent re-opens after an Esc
+      }}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => {
+        setFocused(true);
+        setDismissed(false); // fresh intent re-opens after an Esc
+      }}
+      onBlur={() => setFocused(false)}
       onKeyDown={(event) => {
-        // Esc closes the tooltip, focus stays on the pill. Not a button:
-        // Enter/Space do nothing and it never navigates.
-        if (event.key === 'Escape') setTooltipOpen(false);
+        // Esc closes the tooltip, focus stays on the pill (kept alongside the
+        // document listener so an ancestor's stopPropagation can't eat it).
+        // Not a button: Enter/Space do nothing and it never navigates.
+        if (event.key === 'Escape') setDismissed(true);
       }}
     >
       <span className="restricted-value__pill" aria-hidden="true" style={{ width }}>

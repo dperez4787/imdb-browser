@@ -236,3 +236,53 @@ invisible for an hour and wreck the demo.
   structurally untriggerable): browser/Firebase-token path (no consuming view
   yet), reject mode live (redact mode makes it unreachable via queries —
   unit-only by design).
+- **developer** — fix round on PR #13 after an adversarial review surfaced four
+  defects; all four verified against the code before fixing, all four real, all
+  four fixed (one commit on the branch, plus a merge of main to pick up PR #12's
+  architecture amendment).
+  1. **RestrictedValue tooltip conflated hover and focus in one boolean**
+     (`src/components/RestrictedValue.jsx`): `onMouseLeave` unconditionally
+     closed the tooltip even while the pill held keyboard focus (DES-8: focus
+     holds it until blur/Esc), and a hover-opened tooltip had no Esc path
+     (keydown never reaches an unfocused element). Now hover and focus are
+     tracked separately (open = hover OR focus), Esc sets a dismissal that
+     overrides both while keeping focus (span-level handler plus a
+     document-level listener attached only while open, for the hover-only
+     case), and a fresh hover/focus re-expresses intent and re-opens. Five new
+     colocated tests cover: mouseout-while-focused stays open,
+     blur-while-hovered stays open, Esc on a hover-only tooltip, Esc while
+     hovered+focused (dismissal holds until fresh intent, focus retained), and
+     the document listener detaching when closed.
+  2. **Caller-supplied `staleTime` silently disabled the denial-scoped 60 s
+     freshness** (`src/graphql/hooks.js`): the options spread came after
+     `staleTime`, so any per-call `staleTime` replaced the denial-scoped
+     function entirely — one call site could hide a live grant flip for an
+     hour. Now the caller's `staleTime` is extracted, substituted as the
+     *base* window, and denial-scoped like any other: when the cached envelope
+     reports denials the result is fresh for `min(60 s, base)` regardless of
+     caller options (non-numeric bases — `Infinity`, `'static'`, function form
+     — cannot dodge the cap). Three new tests, including through a real
+     rendered hook with `staleTime: 24h` in options.
+  3. **`getIdToken()` rejection escaped `rawExecute` un-normalized**
+     (`src/graphql/client.js`): the token fetch sat outside the try block, so
+     a rejected Firebase token refresh surfaced as a raw exception — the one
+     failure path outside the documented normalized shape. Now it's caught and
+     thrown as the new `tokenFetchError(err)` from errors.js: kind `'auth'`
+     (credential problem, never `'network'`), message carrying the cause and
+     the no-request-was-sent guarantee, idempotent for already-normalized
+     errors. Tests in client.test.js (execute + executeWithDenials paths,
+     nothing sent) and errors.test.js (factory shape).
+  4. **client.js NOTE comment misstated the source of truth**: it claimed
+     `docs/architecture.md` still specified strip-and-retry with an amendment
+     pending — but the architect's redact-mode amendment landed on main via
+     PR #12. Comment rewritten to point at architecture § Field-level
+     governance as the settled source of truth; `origin/main` merged into the
+     branch so the in-branch copy matches. Comment-only change — no runtime
+     behavior, so no test (noted honestly rather than inventing a doc-diff
+     test).
+  Verified: `npm ci && npm test` green (230 passed / 13 token-gated skipped),
+  `npm run build` green, and the full suite with `LIVE_ROUTER_TOKEN` against
+  the real router green twice (240 passed / 3 skipped; one earlier live run
+  had 2 transient failures that did not reproduce — Cloud Run cold-start
+  latency, not code). PR left out of draft as instructed; body's verified
+  list updated.

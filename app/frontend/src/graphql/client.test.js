@@ -50,6 +50,40 @@ describe('signed-out guard', () => {
     expect(err.kind).toBe('auth');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  // Fix round on PR #13: a rejected token fetch used to escape rawExecute as
+  // the raw exception — the one failure path outside the normalized shape.
+  it('a REJECTED getIdToken() surfaces as the normalized "auth" kind, never a raw exception', async () => {
+    getIdToken.mockRejectedValue(new Error('token refresh failed'));
+
+    const err = await execute(SEARCH_INFO_QUERY).catch((e) => e);
+
+    expect(err).toBeInstanceOf(GraphQLLayerError);
+    expect(err.kind).toBe('auth');
+    expect(err.kind).not.toBe('network'); // credential problem, not transport
+    expect(err.message).toMatch(/token refresh failed/);
+    expect(err.message).toMatch(/no request was sent/i);
+    expect(fetchMock).not.toHaveBeenCalled(); // guard fired before any network
+  });
+
+  it('a rejected token fetch is normalized on the executeWithDenials path too', async () => {
+    getIdToken.mockRejectedValue(new Error('boom'));
+
+    const err = await executeWithDenials(SEARCH_INFO_QUERY).catch((e) => e);
+
+    expect(err).toBeInstanceOf(GraphQLLayerError);
+    expect(err.kind).toBe('auth');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('an already-normalized error thrown by the token fetch passes through untouched (idempotent)', async () => {
+    const original = new GraphQLLayerError('auth', 'already normalized');
+    getIdToken.mockRejectedValue(original);
+
+    const err = await execute(SEARCH_INFO_QUERY).catch((e) => e);
+
+    expect(err).toBe(original);
+  });
 });
 
 describe('credential attach', () => {

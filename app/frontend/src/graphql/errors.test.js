@@ -5,7 +5,13 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ERROR_KINDS, GraphQLLayerError, normalizeError, signedOutError } from './errors.js';
+import {
+  ERROR_KINDS,
+  GraphQLLayerError,
+  normalizeError,
+  signedOutError,
+  tokenFetchError,
+} from './errors.js';
 
 /** Shape a graphql-request ClientError-alike: `.response` with status/errors. */
 function clientError({ status, errors }) {
@@ -220,5 +226,22 @@ describe('signedOutError', () => {
     const e = signedOutError();
     expect(e.kind).toBe('auth');
     expect(e.message).toMatch(/no request was sent/i);
+  });
+});
+
+describe('tokenFetchError (rejected credential fetch — fix round on PR #13)', () => {
+  it('is an auth-kind GraphQLLayerError carrying the cause and the no-request guarantee', () => {
+    const e = tokenFetchError(new Error('token refresh failed'));
+    expect(e).toBeInstanceOf(GraphQLLayerError);
+    expect(e.kind).toBe('auth');
+    expect(e.message).toMatch(/token refresh failed/);
+    expect(e.message).toMatch(/no request was sent/i);
+    expect(e.deniedFields).toEqual([]); // shape complete, never null-checked
+  });
+
+  it('tolerates a cause with no message', () => {
+    const e = tokenFetchError(undefined);
+    expect(e.kind).toBe('auth');
+    expect(e.message).toMatch(/could not obtain a sign-in credential/i);
   });
 });
