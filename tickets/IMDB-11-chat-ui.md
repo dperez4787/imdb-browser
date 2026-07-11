@@ -1,12 +1,12 @@
 ---
 id: IMDB-11
 title: Chat assistant UI in the SPA
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-2, IMDB-10]
 branch: "imdb-11-chat-ui"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/9"
 ---
 
 ## Description
@@ -62,3 +62,31 @@ behavior.
   decided contract: SSE streaming (`text`/`tool`/`done`/`error`), stateless
   client-resent history capped at 20 messages / 16 KB, Firebase ID token from
   `auth.js#getIdToken()`, chat URL from `VITE_CHAT_URL` (localhost:8080 default).
+- **developer** — implemented; PR #9 (draft), `in-review`.
+  **What changed:** `app/frontend/src/chat/` — `chatApi.js` (the one chat network
+  boundary, auth.js-style: token attach, 20-msg/16 KB history caps, fetch +
+  ReadableStream SSE parser for the contract's four events), `useChatSession.js`
+  (send/retry/reset, interleaved tool/text draft, error kinds), `ChatProvider.jsx`
+  (open state, Cmd/Ctrl+/, unread dot, focus wiring), `ChatPanel/ChatToggle/
+  MessageList/UserMessage/AssistantMessage/TypingIndicator/ToolIndicator/
+  ChatComposer/ChatErrorNotice/EmptyChat`, `markdown.jsx` (element-emitting,
+  sanitized, dependency-free) + tests; `AppShell.jsx` (reflow layout + mount —
+  the ticket said App.jsx, but AppShell is the shell chrome and already reserved
+  the mount point), `TopBar.jsx` (toggle), `styles.css` (DES-7 section),
+  `scaffold-conventions.test.js` (fetch ban now scoped to sanctioned boundary
+  modules — IMDB-4 will need the same carve-out for `src/graphql/`).
+  **Verified:** 94 frontend tests green (SSE parser vs synthetic streams: all four
+  event types, split/malformed frames, mid-stream error, truncated stream, HTTP
+  mappings, caps; every DES-7 state at the chatApi seam); `npm run build` green,
+  zero `anthropic` strings in the bundle; REAL credential-less `app/chat` booted
+  locally (`/health` 200) and the UI's real fetch → real 401 → designed
+  auth-rejection state, via jsdom/vitest (`CHAT_INTEGRATION=1` +
+  `VITE_CHAT_URL`), no browser automation available here.
+  **Not verified / honest gaps:** the full authenticated streamed conversation
+  (needs real key + Google sign-in) — the tester/user must demo it; real-browser
+  layout (reflow/scrim/sheet/focus-trap) beyond jsdom. **Problems found outside
+  this ticket:** (1) the chat backend sends no CORS headers, so a real browser on
+  the Vite/Hosting origin will fail preflight against it — IMDB-10 surface, needs
+  a follow-up before the live demo; (2) assistant-markdown in-app links do plain
+  `<a>` navigation until the router ticket lands (no react-router in the app yet),
+  which loses the in-memory conversation on click.
