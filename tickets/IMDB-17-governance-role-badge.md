@@ -1,7 +1,7 @@
 ---
 id: IMDB-17
 title: Governance role badge — show who the graph thinks you are
-status: in-review
+status: done
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-2, IMDB-4]
@@ -135,3 +135,53 @@ headers are the supported mechanism today.
   gcloud identity maps to no persona so the header is correctly omitted;
   deferred per the user directive and left to seam tests. Draft left for the
   tester; not marked ready.
+- **tester** — **verdict: PASS on every agent-verifiable criterion; status →
+  `done`, PR #20 lifted from draft.** Clean checkout `npm ci && npm test &&
+  npm run build`: **375 passed, 17 skipped** (the live/hermetic set), build
+  clean, exit 0. Per-criterion:
+  - **AC1 (roles from `X-Imdb-Roles`, no extra round trip)** — **pass.** The
+    developer's coverage had a gap: nothing hermetic proved client.js feeds
+    the store (only the token-gated live test exercised that wiring). Added
+    `src/graphql/client.rolesIngest.tester.test.js` (fetch-stub seam, same as
+    client.test.js): a resolved response with the header lands the store on
+    the roles in order + revision off **exactly one fetch** — nothing
+    badge-only.
+  - **AC2 (no persona → distinct no-role state)** — **pass, verified LIVE.**
+    `LIVE_ROUTER_TOKEN="$(gcloud auth print-identity-token)" npx vitest run
+    src/graphql/rolesStore.live.integration.test.js` → 1 passed: real client
+    against the real router, store landed on `roles: []`, numeric revision.
+    Independent raw check (curl, same token): HTTP 200, `X-Imdb-Roles`
+    **absent**, `x-imdb-policy-revision: 8`, both CORS-exposed via
+    `Access-Control-Expose-Headers`. The three-state honesty rule (null =
+    empty slot / [] = dashed `no data role` / list = solid pill) is asserted
+    in the developer's RoleBadge.test.jsx and rolesStore.test.js.
+  - **AC3 (roles change → next response reflects it, no reload)** — **pass at
+    the seam.** Store and badge flip on grant/re-deny across responses
+    (developer's tests + my fetch-level grant→re-deny test). The live
+    console-grant flip needs a persona grant only the user can perform —
+    **not verified live, deferred per the 2026-07-11 directive.**
+  - **AC4 (unit tests: present/absent/changing)** — **pass** (developer's
+    rolesStore.test.js covers all three plus revision fallback and reset).
+  - **AC5 (no raw headers outside `src/graphql/`)** — **pass.** Grep across
+    `src/`: zero header reads outside the layer; RoleBadge/UserMenu consume
+    only `useGovernanceRoles()`; no `fetch()`/inline queries in components.
+  - **DES-1 addendum** — **pass.** Added tester suites for the gaps:
+    `RoleBadge.slot.tester.test.jsx` (zero-layout-jump: the slot keeps the
+    single class `role-badge` across every flip; stylesheet pins
+    `width: 104px`, pill `max-width: 11ch` + ellipsis, dashed variant declares
+    no width, ≤720px hides the slot) and `UserMenu.tester.test.jsx` (exactly
+    ONE button in every badge state — no new tab stop, badge aria-hidden;
+    Data-roles section non-focusable, one menuitem; **sign-out and unmount
+    reset the store to Unknown** — no stale roles for the next sign-in).
+    Accessible-name suffix, menu section copy, `policy rev <n>`, and the
+    em-dash unknown state were already covered by the developer's tests and
+    pass.
+  - **client.js additive** — **pass.** Full pre-existing suite green
+    (client/errors/hooks/search untouched); my tests assert `execute()` still
+    resolves bare `data`, `executeWithDenials()` keeps `{ data, deniedFields }`,
+    a transport failure still normalizes to `GraphQLLayerError` and does NOT
+    move the store, and the signed-out guard sends nothing and ingests
+    nothing.
+  Deferred (needs the user, not the agents): the live roles-PRESENT badge and
+  the live console-grant flip — grant a persona to a test identity and watch
+  the pill restyle on the next fetched response.
