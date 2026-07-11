@@ -1,12 +1,25 @@
 /**
- * GraphQL client boundary (stub).
+ * GraphQL client boundary (IMDB-4).
  *
  * Per CLAUDE.md, this directory is the SPA's ONE sanctioned GraphQL surface:
  * all data comes from the cosmo federation router through this module. No
  * `fetch()` and no inline query strings inside components — ever.
  *
- * Intentionally empty in IMDB-1. Client library choice, caching, auth-header
- * attachment, and error normalization are OPEN in docs/architecture.md
- * ("GraphQL client layer") and land with IMDB-4.
+ * Components import the HOOKS (and, rarely, keys/staleTimes for cache
+ * plumbing) — never the transport in client.js or the documents in
+ * queries.js. main.jsx wires createQueryClient() into a QueryClientProvider.
+ * Every failure surfaces as errors.js's normalized {kind, message, errors}.
  */
-export {};
+export { ERROR_KINDS, GraphQLLayerError } from './errors.js';
+export {
+  DEFAULT_PAGE_SIZE,
+  useFacets,
+  useName,
+  useSearch,
+  useSearchInfo,
+  useSearchNames,
+  useSearchTitles,
+  useTitle,
+} from './hooks.js';
+export { queryKeys, staleTimes } from './keys.js';
+export { createQueryClient } from './queryClient.js';

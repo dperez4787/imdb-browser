@@ -1,8 +1,9 @@
 /**
  * Mechanically-checkable conventions from CLAUDE.md — ES modules, Node LTS
- * pin, the sanctioned `src/graphql/` boundary, no fetch()/XHR/GraphQL in
- * source (until IMDB-4's client module), and — since IMDB-2 — Firebase
- * confined to the auth boundary (`auth.js` + `firebase.js`), nowhere else.
+ * pin, the sanctioned `src/graphql/` boundary, no fetch()/XHR/GraphQL outside
+ * that boundary (its exemption landed with IMDB-4's client module), and —
+ * since IMDB-2 — Firebase confined to the auth boundary (`auth.js` +
+ * `firebase.js`), nowhere else.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -49,10 +50,15 @@ describe('IMDB-1 scaffold conventions', () => {
     expect(existsSync(join(srcDir, 'graphql'))).toBe(true);
   });
 
-  it('makes no data requests: no fetch()/XHR/GraphQL operations in source', () => {
-    // Exclude this checker itself: its assertion patterns mention the banned strings.
+  it('confines data requests: no fetch()/XHR/GraphQL operations outside src/graphql/ (IMDB-4)', () => {
+    // Exclude this checker itself (its assertion patterns mention the banned
+    // strings) and the sanctioned GraphQL boundary, which since IMDB-4 is the
+    // one place transport and operation documents may live.
     const self = fileURLToPath(import.meta.url);
-    for (const file of sourceFiles(srcDir).filter((f) => f !== self)) {
+    const graphqlBoundary = join(srcDir, 'graphql') + '/';
+    for (const file of sourceFiles(srcDir).filter(
+      (f) => f !== self && !f.startsWith(graphqlBoundary),
+    )) {
       const code = stripComments(readFileSync(file, 'utf8'));
       expect(code, `${file} must not call fetch()`).not.toMatch(/\bfetch\s*\(/);
       expect(code, `${file} must not use XMLHttpRequest`).not.toMatch(/XMLHttpRequest/);
