@@ -1,11 +1,11 @@
 ---
 id: IMDB-2
 title: Firebase Auth with Google-only sign-in behind an AuthGate
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-1]
-branch: ""
+branch: "imdb-2-firebase-auth-authgate"
 pr: ""
 ---
 
@@ -52,3 +52,10 @@ signed-in user indicator + sign-out affordance in the app shell.
   concept and shared visual language all other specs reference. All three designer
   questions from the description are answered; module names match the ticket
   (`auth.js`, `AuthGate`). Nothing unsettled → `ready-for-dev`.
+- **developer** — claimed; branch `imdb-2-firebase-auth-authgate`. Registered the
+  dedicated Firebase Web App "imdb-browser" in `project-d60a83c1-2c60-4d51-ad0`
+  (app id `1:756865700041:web:f7e58da7556e44f0863d18`, additive `firebase apps:create
+  web` — no IAM change), so the committed config is the real one, not an interim
+  borrow from linear-example. Note: the ticket's file list says `firebase-config.js`;
+  architecture.md and linear-example both name it `src/firebase.js` — going with
+  `firebase.js`.
