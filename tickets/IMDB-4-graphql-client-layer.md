@@ -1,11 +1,11 @@
 ---
 id: IMDB-4
 title: GraphQL client layer for the SPA
-status: in-progress
+status: in-review
 owner: product-owner
 depends-on: [IMDB-1, IMDB-2, IMDB-3]
 branch: "imdb-4-graphql-client-layer"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/8"
 ---
 
 ## Description
@@ -65,3 +65,31 @@ and IMDB-2's auth (the credential presumably derives from the signed-in Firebase
   verification of every operation document against the router with a Google OIDC
   identity token (the other configured JWKS provider) since a Firebase ID token
   cannot be minted non-interactively.
+- **developer** — implemented → `in-review`, PR #8 (draft):
+  https://github.com/dperez4787/imdb-browser/pull/8. Files: `src/graphql/`
+  (`client.js` transport + signed-out guard, `queries.js` documents, `errors.js`
+  normalization, `hooks.js`/`keys.js` hooks + keys + staleTimes,
+  `queryClient.js` factory, three colocated test files), `main.jsx`
+  (QueryClientProvider), `scaffold-conventions.test.js` (the no-fetch/no-GraphQL
+  scan now exempts `src/graphql/`, as its own comment anticipated),
+  `package.json`/lockfile (`graphql-request` 7.4, `@tanstack/react-query` 5.101).
+  Verified: 83 unit tests + build green; ALL seven operation documents executed
+  against the LIVE router with real post-rebuild data (searchInfo.rebuiltAt
+  2026-07-11T03:12Z; Godfather/Pacino/union-search/episode results in the PR),
+  authenticated with a Google OIDC identity token. HONESTLY NOT verified: the
+  Firebase-ID-token path end-to-end (needs an interactive sign-in — exercised
+  only at the mocked `getIdToken()` seam), and no view consumes the hooks yet.
+  Two findings for the architect (details + evidence in the PR):
+  (1) the router's new fieldAuth module denies `Rating.numVotes`,
+  `Name.birthYear` (role `analyst` only; policy bundle `principals` map is
+  EMPTY, so every Google/Firebase identity is denied) and `Name.deathYear`
+  (denied to all) — 403 PERMISSION_DENIED verified live, so the operation
+  documents deliberately do NOT select these three fields; the "most-voted
+  known-for title" poster heuristic in architecture §Person visuals needs
+  `numVotes` and currently cannot have it (averageRating still readable,
+  POPULARITY_DESC sorting unaffected).
+  (2) the router wraps orchestrator validation errors and rewrites BAD_REQUEST
+  to nested DOWNSTREAM_SERVICE_ERROR, so live they normalize to kind `graphql`
+  (with the useful nested message surfaced), not `bad-request`; errors.js
+  already scans nested errors, so router-side passthrough fixes this with no
+  client change. Did not touch AppShell/TopBar/chat files (IMDB-11 partition).
