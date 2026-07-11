@@ -1,11 +1,11 @@
 /**
- * IMDB-1 tester coverage: mechanically-checkable scaffold criteria from the
- * ticket and CLAUDE.md — ES modules, Node LTS pin, the sanctioned
- * `src/graphql/` boundary, and a network-free scaffold (no fetch()/GraphQL/
- * Firebase anywhere in source).
+ * Mechanically-checkable conventions from CLAUDE.md — ES modules, Node LTS
+ * pin, the sanctioned `src/graphql/` boundary, no fetch()/XHR/GraphQL in
+ * source (until IMDB-4's client module), and — since IMDB-2 — Firebase
+ * confined to the auth boundary (`auth.js` + `firebase.js`), nowhere else.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -49,7 +49,7 @@ describe('IMDB-1 scaffold conventions', () => {
     expect(existsSync(join(srcDir, 'graphql'))).toBe(true);
   });
 
-  it('makes no network requests: no fetch()/XHR/GraphQL/Firebase in source', () => {
+  it('makes no data requests: no fetch()/XHR/GraphQL operations in source', () => {
     // Exclude this checker itself: its assertion patterns mention the banned strings.
     const self = fileURLToPath(import.meta.url);
     for (const file of sourceFiles(srcDir).filter((f) => f !== self)) {
@@ -59,6 +59,17 @@ describe('IMDB-1 scaffold conventions', () => {
       expect(code, `${file} must not contain GraphQL operations`).not.toMatch(
         /\b(?:gql`|graphql\(|query\s+\w+\s*[({]|mutation\s+\w+\s*[({])/,
       );
+    }
+  });
+
+  it('confines Firebase to the auth boundary: auth.js + firebase.js only (IMDB-2 AC)', () => {
+    const self = fileURLToPath(import.meta.url);
+    // The boundary itself, and its colocated test (which mocks the SDK seam).
+    const boundary = new Set(['auth.js', 'firebase.js', 'auth.test.js']);
+    for (const file of sourceFiles(srcDir).filter(
+      (f) => f !== self && !boundary.has(basename(f)),
+    )) {
+      const code = stripComments(readFileSync(file, 'utf8'));
       expect(code, `${file} must not reference Firebase`).not.toMatch(/firebase/i);
     }
   });

@@ -1,0 +1,328 @@
+/* DES-1 shared visual language: house lights down. */
+:root {
+  --surface: #0e1014;
+  --card: #181b22;
+  --hairline: #262a33;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --amber: #f5c518;
+  --error: #f0938b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---- Wordmark ------------------------------------------------------- */
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.wordmark__dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--amber);
+  align-self: center;
+}
+
+/* ---- Auth curtain (resolving state) ---------------------------------- */
+
+.auth-curtain {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.auth-curtain .wordmark {
+  font-size: 1.5rem;
+  opacity: 0.4;
+  animation: curtain-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes curtain-pulse {
+  50% {
+    opacity: 0.22;
+  }
+}
+
+/* ---- Sign-in screen --------------------------------------------------- */
+
+.signin {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+/* Marquee-dot ornament: pure CSS, amber, slow shimmer. */
+.signin__dots {
+  width: min(400px, 100%);
+  height: 8px;
+  background-image: radial-gradient(circle 3px at 12px 4px, var(--amber) 2px, transparent 2.5px);
+  background-size: 28px 8px;
+  background-repeat: repeat-x;
+  opacity: 0.55;
+  animation: marquee-shimmer 2.4s steps(2) infinite;
+}
+
+@keyframes marquee-shimmer {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.signin__card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+}
+
+.signin__wordmark {
+  margin: 0 0 0.75rem;
+  font-size: 1.4rem;
+}
+
+.signin__wordmark .wordmark {
+  font-size: inherit;
+}
+
+.signin__tagline {
+  margin: 0 0 2rem;
+  color: var(--muted);
+}
+
+.signin__error {
+  margin: 1rem 0 0;
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+.signin__caption {
+  margin: 1.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Google brand button: light treatment, G mark, "Sign in with Google". */
+.google-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 24px;
+  border: 1px solid #dadce0;
+  border-radius: 20px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.google-btn:disabled {
+  background: #f1f3f4;
+  color: #5f6368;
+  cursor: default;
+}
+
+.google-btn__mark {
+  flex: none;
+}
+
+.google-btn__spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #dadce0;
+  border-top-color: #5f6368;
+  animation: spinner-turn 0.8s linear infinite;
+}
+
+@keyframes spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- App shell / TopBar ---------------------------------------------- */
+
+.app-shell__main {
+  padding: 2rem 1.5rem;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 56px;
+  padding: 0 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.topbar__home {
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.topbar__omnibox-slot {
+  flex: 1;
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  /* Wordmark collapses to the amber dot. */
+  .topbar__home .wordmark__text {
+    display: none;
+  }
+
+  .topbar__home .wordmark__dot {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* ---- UserMenu ---------------------------------------------------------- */
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu__button {
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.user-menu__avatar {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.user-menu__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0.25rem 0;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+.user-menu__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.user-menu__name {
+  font-weight: 600;
+}
+
+.user-menu__email {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.user-menu__signout {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu__signout:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+/* ---- Placeholder home view -------------------------------------------- */
+
+.home-placeholder {
+  max-width: 32rem;
+  margin: 4rem auto;
+  text-align: center;
+}
+
+.home-placeholder p {
+  color: var(--muted);
+}
+
+/* ---- Motion ------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-curtain .wordmark,
+  .signin__dots,
+  .google-btn__spinner {
+    animation: none;
+  }
+}
