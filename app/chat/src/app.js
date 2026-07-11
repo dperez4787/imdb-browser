@@ -12,6 +12,7 @@ import express from 'express'
 import { authGate, firebaseVerifyToken } from './auth.js'
 import { createAgent } from './anthropic.js'
 import { BODY_LIMIT } from './config.js'
+import { cors } from './cors.js'
 import { createRateLimiter } from './ratelimit.js'
 import { sseSend, sseStart } from './sse.js'
 import { validateChatBody } from './validate.js'
@@ -22,6 +23,11 @@ export function createApp({
   rateLimiter = createRateLimiter(),
 } = {}) {
   const app = express()
+
+  // CORS first (IMDB-15): allow-origin on every response — including 401s and
+  // the SSE stream — and the OPTIONS preflight (which never carries an
+  // Authorization header) short-circuits to 204 before body parsing and auth.
+  app.use(cors())
 
   // 16 KB body cap (guardrail): express rejects larger bodies with 413 before
   // any of our code — and therefore before any Anthropic call — runs.
