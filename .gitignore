@@ -7,3 +7,6 @@ dist/
 *.local
 .firebase/
 firebase-debug.log
+
+# Claude agent worktrees (never tracked)
+.claude/worktrees/
