@@ -1,11 +1,11 @@
 ---
 id: IMDB-11
 title: Chat assistant UI in the SPA
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-2, IMDB-10]
-branch: ""
+branch: "imdb-11-chat-ui"
 pr: ""
 ---
 
@@ -56,3 +56,9 @@ behavior.
   non-streaming: typing indicator) — the developer follows whichever the contract
   states, deciding nothing. Design leaves no open decision → `ready-for-dev`
   (contract ordering rides depends-on IMDB-10).
+- **developer** — claimed. Branch `imdb-11-chat-ui` off `main` (which now contains
+  IMDB-2's auth gate and IMDB-10's chat backend, so both dependencies are satisfied
+  — their ticket frontmatter lags but both are merged). Implementing against the
+  decided contract: SSE streaming (`text`/`tool`/`done`/`error`), stateless
+  client-resent history capped at 20 messages / 16 KB, Firebase ID token from
+  `auth.js#getIdToken()`, chat URL from `VITE_CHAT_URL` (localhost:8080 default).
