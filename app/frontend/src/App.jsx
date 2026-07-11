@@ -16,6 +16,7 @@ import NotFoundPage from './NotFoundPage.jsx';
 import PersonPage from './people/PersonPage.jsx';
 import HomePage from './search/HomePage.jsx';
 import SearchPage from './search/SearchPage.jsx';
+import TitleSearchView from './titles/TitleSearchView.jsx';
 import TitlePage from './title/TitlePage.jsx';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/titles" element={<TitleSearchView />} />
             <Route path="/title/:tconst" element={<TitlePage />} />
             <Route path="/person/:nconst" element={<PersonPage />} />
             <Route path="*" element={<NotFoundPage />} />
