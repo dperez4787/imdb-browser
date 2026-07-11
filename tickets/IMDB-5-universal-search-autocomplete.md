@@ -1,7 +1,7 @@
 ---
 id: IMDB-5
 title: Universal search box with autocomplete and poster-rich results
-status: in-review
+status: done
 owner: product-owner
 design: designs/DES-2-universal-search.md
 depends-on: [IMDB-4]
@@ -138,3 +138,83 @@ where selecting a result navigates — coordinate with the architect.
     `main.jsx` supplies in production) — zero assertion changes; (4) the old
     `.home-placeholder` CSS block is now unused but was left in place per the
     append-only styles rule this round.
+- **tester** — verdict: **all agent-verifiable acceptance criteria PASS** →
+  `done`, PR #14 taken out of draft (`gh pr ready`) per the user directive of
+  2026-07-11 (browser-flow/visual criteria deferred to the upcoming testing
+  period, reported honestly below as not-verified). Verified on this branch
+  at 03f50cf; own suites committed (`imdb5-acceptance.tester.test.jsx`,
+  `imdb5-signedout-guard.tester.test.jsx`, `imdb5-live-search.tester.test.js`)
+  — 30 tester tests, a deliberately different seam from the developer's
+  (real hook/debounce/QueryClient/mergeRows, only `execute` faked).
+  - **Clean-checkout proof:** `npm ci` → exit 0; `npm test` → 185 passed /
+    7 skipped (the 7 = IMDB-4's and IMDB-5's live suites, gated on
+    `LIVE_ROUTER_TOKEN` so the suite stays hermetic), exit 0;
+    `npm run build` → exit 0.
+  - **Per-criterion:**
+    1. *Interleaved ranked list (union-first, Appendix A fill)* — **PASS**
+       (mechanics). Unit + integration + hostile cases (union overflow cap 8,
+       dedupe across union+fill and inside lists, unknown `__typename`
+       skipped, missing-id skipped, 2:1 cadence with ragged lists). LIVE with
+       the exact shipped document (gcloud OIDC token): `godfather` union =
+       T·T·N·T·T·T·T·T — genuinely interleaved in server order; `godf`
+       (mid-word) = empty union + non-empty prefix fill, so Appendix A is a
+       real scenario. Note `coppola` live ranks 3 Titles then 5 Names — that
+       is server order, which the client correctly does not regroup. The
+       *signed-in-user-typing* framing is browser-flow: deferred (below).
+    2. *Posters with fallback, person placeholder* — **PASS** (component +
+       live URL semantics). PosterImage → FallbackArt on error/missing id,
+       never a broken img; person rows always Monogram, never an `<img>`.
+       LIVE: returned `tt0068646` poster → 200 image/jpeg; bogus id → 404;
+       three of seven live-returned godfather titles 404 (fallback is a real
+       path, not hypothetical). Visual eyeballing deferred.
+    3. *Debounce, one request per settled burst* — **PASS**. Through the
+       REAL hook: a 5-keystroke burst → exactly one `execute` with the
+       settled query and none for intermediates; second settled burst →
+       exactly one more; `<2` chars → zero requests, panel closed.
+    4. *Lazy-loading images* — **PASS**. Every poster `<img loading="lazy">`;
+       panel hard-capped at 8 rows → ≤8 OMDb requests per panel.
+    5. *Loading/no-results/error states per DES-2* — **PASS** (jsdom).
+       First-load 3-skeleton shimmer (no footer yet); previous rows at full
+       opacity + amber progress bar on refetch; no-results copy; the
+       index-never-built copy on `rebuiltAt: null` (never blames the query);
+       error + working Retry (refetches through the transport) with NO
+       freshness footer. Pixel fidelity deferred.
+    6. *Keyboard access* — **PASS**. Row-1 preselect (re-preselect on new
+       result sets), wrapping arrows with focus pinned to the input
+       (`aria-activedescendant`), Enter → correct route, Esc closes then
+       blurs, Tab closes, `✕` clears/closes/keeps focus, `/` and Cmd/Ctrl+K
+       focus from anywhere but never steal from another text field,
+       hover+Enter agree. Mobile overlay toggle/Esc exercised in jsdom only.
+    7. *Selecting navigates to the detail route* — **PASS**.
+       `/title/:tconst`, `/person/:nconst` placeholders render;
+       `/search?q=` hydrates decoded text from the URL; dev server serves
+       all deep links (200 + SPA root).
+    8. *Signed-out users never see the search UI* — **PASS** (seam level).
+       App-level: signed out renders no combobox (developer suite);
+       tester adds: while signed out the universal-search path produces
+       **zero network activity** (global fetch spied) and surfaces kind
+       `auth`, both at `execute()` and through the real hook. The live
+       Google-popup flow is deferred (below).
+  - **Folded IMDB-13 (freshness footer)** — **PASS**: relative wording
+    (`just now`/`min`/`h`/`Mon D`), absolute timestamp on the ⓘ,
+    `Index not yet built` on null, footer absent when `searchInfo` is
+    unavailable (absence, never a guess), and it rides in the SAME aliased
+    document (live `rebuiltAt` = `2026-07-11T03:12:24.167Z`, non-null).
+    **Recommendation to the PO: IMDB-13's acceptance criteria are delivered
+    by this PR — close IMDB-13 when this merges** (its file is on `main`,
+    not edited here).
+  - **Governance note (not a defect):** the shipped document intentionally
+    omits `Rating.numVotes` per the PO advisory — with redact-mode governance
+    live this is a design choice; the votes parenthetical is opportunistic,
+    so IMDB-14 (PR #13, in review) re-adding the field lights it up with no
+    component change.
+  - **NOT VERIFIED — deferred to the upcoming testing period (user
+    directive, 2026-07-11):** the signed-in browser flow end-to-end (Google
+    popup → typing → panel → navigate) with a real Firebase ID token (live
+    checks used the router's Google-OIDC JWKS provider instead), and visual
+    eyeballing of posters / panel styling / the <720px mobile overlay
+    (jsdom-level only). These are deferred, not failed.
+  - **Conventions:** no `fetch()`/inline documents outside `src/graphql/`;
+    Firebase confined to `auth.js`/`firebase.js`; only network destinations
+    are the router (GraphQL module) and sanctioned OMDb image URLs; no
+    secrets beyond the sanctioned OMDb key.
