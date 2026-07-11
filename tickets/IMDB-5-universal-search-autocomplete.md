@@ -1,11 +1,11 @@
 ---
 id: IMDB-5
 title: Universal search box with autocomplete and poster-rich results
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-2-universal-search.md
 depends-on: [IMDB-4]
-branch: ""
+branch: "imdb-5-universal-search"
 pr: ""
 ---
 
@@ -89,3 +89,15 @@ where selecting a result navigates — coordinate with the architect.
   is server-side (Appendix A's fallback interleave is positional over
   server-sorted lists, needing no `numVotes` values), so this ticket stays
   `ready-for-dev` with no new dependency.
+- **developer** — claimed; branch `imdb-5-universal-search` off `main` (post-PR-#8,
+  so the IMDB-4 client layer is in). Implementing per DES-2 as revised:
+  union-primary rows + Appendix A prefix fill in one aliased document, freshness
+  footer folded in (IMDB-13), routing scaffold (`react-router` v7 per
+  architecture) with placeholder `/title/:tconst` / `/person/:nconst` /
+  `/search?q=` routes. Per the PO's governance advisory above, the search
+  document does NOT select `Rating.numVotes` (no strip-and-retry exists yet —
+  IMDB-14 owns it); the row renders the votes parenthetical opportunistically
+  whenever a response carries it, so re-adding the field to the document under
+  IMDB-14 lights it up with no component change. New GraphQL code goes in NEW
+  files (`searchQueries.js`, `searchHooks.js`) — existing `src/graphql/` files
+  untouched, IMDB-14 owns them this round.
