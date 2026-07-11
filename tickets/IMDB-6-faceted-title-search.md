@@ -1,11 +1,11 @@
 ---
 id: IMDB-6
 title: Faceted title search view
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-3-faceted-title-search.md
 depends-on: [IMDB-4]
-branch: ""
+branch: imdb-6-faceted-title-search
 pr: ""
 ---
 
@@ -84,3 +84,16 @@ image-missing / error states.
   selection — presumed ungoverned, but the developer should verify it against the
   live router at implementation and flag IMDB-14 if filtering is also governed.
   Stays `ready-for-dev` with no new dependency.
+- **developer** — claimed → `in-progress` on branch `imdb-6-faceted-title-search`.
+  Live-introspected the router (identity token) to pin real names before coding:
+  facet dimensions are `TitleFacetDimension` (`GENRES`, `TITLE_TYPES`, plus DECADES /
+  RATING_BANDS / RUNTIME_BANDS), `TitleSort` = POPULARITY_DESC | RATING_DESC |
+  RELEVANCE | YEAR_ASC | YEAR_DESC, `TitleSearchFilter` has `includeAdult` (default
+  false) + `peopleMode` (default ALL). Confirmed the shipping query shape live:
+  `searchTitles(filter:{genresAny:["Horror"],votesFrom:1000},sort:RATING_DESC,…)`
+  returns contextual `facets(dimensions:[GENRES,TITLE_TYPES],perDimension:50)` that
+  re-count within the filter, `total:10000 / totalIsCapped:true`, and `numVotes`
+  redacted (`extensions.governance.redactedFields:["Rating.numVotes"]`) while
+  `averageRating` survives — numVotes stays optimistically selected. `votesFrom` is a
+  filter *input* and is NOT governed (accepted, no denial) — nothing to flag on
+  IMDB-14.
