@@ -1,7 +1,7 @@
 ---
 id: IMDB-15
 title: Chat backend CORS headers so browsers can call /api/chat cross-origin
-status: in-review
+status: in-progress
 owner: product-owner
 depends-on: []
 branch: "imdb-15-chat-backend-cors"
@@ -83,3 +83,31 @@ is the recorded default; note any deviation in the Log and in
   at `http://localhost:5173` completing a streamed chat round-trip. The SSE
   allow-origin path is proven only by the supertest test with injected
   verifier/agent fakes, not against live Firebase/Anthropic. For the tester.
+- **tester** — verdict on PR #11. Added an independent acceptance suite
+  (`app/chat/src/cors.acceptance.test.js`, 9 tests) beyond the developer's:
+  preflight from an arbitrary origin, OPTIONS reaching neither the verifier nor
+  the rate limiter, allow-origin surviving onto the 429/400/413 error paths,
+  no `Allow-Credentials` on any path, mixed-case header tolerance. Clean
+  checkout `npm ci && npm test` in `app/chat`: **45/45 pass, exit 0**. Also
+  booted the real server credential-less (`PORT=8790 node src/server.js`) and
+  curled it live: preflight → 204 with `Access-Control-Allow-Origin: *`,
+  `Allow-Methods: GET, POST, OPTIONS`, `Allow-Headers: Authorization,
+  Content-Type`, `Max-Age: 86400`; forged-token POST → 401 JSON **with**
+  `Access-Control-Allow-Origin: *`; `/health` → 200 `{"status":"ok"}` with
+  allow-origin; preflight from `https://attacker.example` → 204. No
+  `Access-Control-Allow-Credentials` on any observed response.
+  Per-criterion: AC1 preflight — **PASS** (test + live curl). AC2 401 with
+  allow-origin — **PASS** (test + live curl). AC3 SSE with allow-origin —
+  **PASS** (supertest through the real app with injected verifier/agent fakes;
+  live SSE requires real credentials, see AC5). AC4 /health unregressed —
+  **PASS** (test + live curl). AC5 human/live signed-in browser round-trip —
+  **NOT VERIFIED**: needs a Google-signed-in browser at
+  `http://localhost:5173` and a real `ANTHROPIC_API_KEY`, neither available to
+  the tester. Steps for a human: (1) `cd app/chat && npm ci`, put
+  `ANTHROPIC_API_KEY=...` in a gitignored `app/chat/.env`, `npm start`;
+  (2) `cd app/frontend && npm ci && npm run dev`, open
+  `http://localhost:5173`, sign in with Google; (3) send a chat message;
+  (4) confirm a streamed assistant reply renders and the devtools console
+  shows no CORS errors. Because AC5 is not verified, PR #11 **stays a draft**
+  and this ticket returns to `in-progress`. Everything mechanically
+  verifiable passed.
