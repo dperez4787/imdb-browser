@@ -230,6 +230,18 @@ Validation failures (caps, exclusive fields, inverted ranges, `offset` > 10,000)
 return GraphQL `BAD_REQUEST` errors, not empty results — they render the error state;
 the URL module clamps before sending so no rail interaction can produce one.
 
+**Governance (architecture § Field-level governance):** `Rating.numVotes` is
+governed and currently denied to everyone. The `items` selection above **keeps it
+optimistically** — the client strips denied coordinates and retries, the hook
+returns `deniedFields` alongside `data`, and a grant flows through on the next
+fresh fetch with no code change; the co-select rule holds (`averageRating` beside
+`numVotes`). **No rendered element in this view depends on it**: `TitleCard` shows
+`year · ★rating` (`averageRating`, ungoverned) and no vote count, so denial changes
+nothing visible and this view never renders DES-8's restricted treatment. The
+Rating sort's `votesFrom: 1000` guard and the `votesFrom` URL param are **filter
+inputs evaluated server-side**, not field reads — field governance does not affect
+them.
+
 Operational note: until the user runs imdb-federation's `./scripts/rebuild.sh`
 (verified never yet run — see `docs/architecture.md`), this entire view sits in the
 index-never-built state; demoing or testing it requires that rebuild first.

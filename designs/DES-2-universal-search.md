@@ -68,7 +68,13 @@ else — no data is fetched until the user types.
 
 - Max **8 rows**. Title rows: 40×60 poster thumb (`PosterImage`, 2:3), primary title,
   muted metadata line `year · type · ★ rating (votes, compact e.g. 2.1M)`; fields
-  missing from a stub simply drop out of the line. Person rows: 40px `Monogram` disc,
+  missing from a stub simply drop out of the line. The votes parenthetical is
+  **opportunistic**: `Rating.numVotes` is governed (denied to everyone today, per
+  architecture § Field-level governance), so it renders only when the value is
+  present — while denied it drops out silently exactly like any missing field, and
+  no row ever renders DES-8's restricted treatment (a transient ranked list is
+  explicitly outside its scope — DES-8 § where it deliberately doesn't apply).
+  Nothing else in the row reads a governed field. Person rows: 40px `Monogram` disc,
   primary name, muted professions (e.g. `Actor · Director`, max 3, fallback word
   `Person`).
 - Rows are visually interleaved in one list — **no "Titles" / "People" section
@@ -219,7 +225,16 @@ to `POPULARITY_DESC` = sum of known-for vote counts), so both fill lists arrive 
 popularity order and the client never compares popularity across lists; (2) poster URLs
 are constructed client-side as `https://img.omdbapi.com/?i=<tconst>&apikey=db1f8efc`
 (key public by design); (3) the union excludes adult titles, and both the union query
-and the prefix filters require ≥2 characters — matching the panel's ≥2-char trigger.
+and the prefix filters require ≥2 characters — matching the panel's ≥2-char trigger;
+(4) **governance**: `Rating.numVotes` is governed (denied to everyone today). The
+document **keeps selecting it optimistically** per architecture § Field-level
+governance — the client strips denied coordinates and retries, so a live grant makes
+vote counts appear in rows on the next settled keystroke with no code change. The
+co-select rule holds (`averageRating` beside `numVotes`), no rendered element
+*depends* on it (the parenthetical is opportunistic, ranking and fill order are
+server-side), and the accepted cost is one extra round trip per autocomplete fetch
+while denied — bounded by the strip-and-retry mechanism, invisible in the panel
+(rows render from the retried response like any other).
 
 ## Appendix A — prefix fill order (the demoted client merge)
 

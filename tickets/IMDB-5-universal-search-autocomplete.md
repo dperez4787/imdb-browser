@@ -79,3 +79,13 @@ where selecting a result navigates — coordinate with the architect.
   "aliased two-query document" AC parenthetical as "the single aliased search
   document" per the revised spec. Also added: the index-never-built empty state
   (`searchInfo.rebuiltAt` null until the user runs the federation rebuild).
+- **product-owner** — governance advisory (no AC/status change; see IMDB-14 and
+  IMDB-4's Log/PR #8): the router now denies `Rating.numVotes`, `Name.birthYear`,
+  and `Name.deathYear` to everyone, and **selecting a denied field 403s the whole
+  operation** — so this ticket's search document must not select them (DES-2's query
+  snippet, which predates governance and still selects `numVotes`, is being trimmed
+  under IMDB-14's design pass; IMDB-4's shipped operation documents already omit
+  them). Nothing in this ticket's ACs displays those fields, and the revised ranking
+  is server-side (Appendix A's fallback interleave is positional over
+  server-sorted lists, needing no `numVotes` values), so this ticket stays
+  `ready-for-dev` with no new dependency.

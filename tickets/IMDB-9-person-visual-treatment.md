@@ -4,7 +4,7 @@ title: Person visual treatment — known-for poster mosaic vs placeholder
 status: ready-for-dev
 owner: product-owner
 design: designs/DES-6-person-visual-treatment.md
-depends-on: [IMDB-5, IMDB-8]
+depends-on: [IMDB-5, IMDB-8, IMDB-14]
 branch: ""
 pr: ""
 ---
@@ -33,6 +33,13 @@ IMDB-5 and IMDB-8.
   request budget per person card and per person page.
 - Person results in universal search and the person detail header render the approved
   treatment exactly as specified.
+- The card-variant poster pick works under the router's field governance:
+  `Rating.numVotes` (DES-6's original "most-voted known-for" criterion) is governed
+  and currently denied to everyone, so with it denied the card still shows a
+  known-for poster chosen by the revised spec's denial-safe rule — no query fails, no
+  extra OMDb requests, no error state — and if the spec keeps `numVotes` as an
+  opportunistic upgrade, a granted field improves the pick on the next fresh fetch
+  with no redeploy.
 - A person whose known-for titles have no retrievable posters (missing/404) falls back
   gracefully to the placeholder/initials treatment — never a broken image.
 - Observed OMDb request volume for a person card/page stays within the spec's budget
@@ -71,3 +78,26 @@ IMDB-5 and IMDB-8.
   badge on person cards, monogram floor everywhere; the monogram-everywhere
   contingency is retired. Spec `approved` → `ready-for-dev` (depends-on
   IMDB-5/IMDB-8 unchanged — this upgrades what they ship).
+- **product-owner** — amended for router field-level governance (see IMDB-14 and
+  IMDB-4's Log/PR #8): `Rating.numVotes` — the exact field DES-6's card-variant
+  "most-voted known-for" pick reads — is governed and currently denied to everyone,
+  live, so the approved heuristic cannot run today. Moved back to `needs-design` for
+  a DES-6 revision: the spec needs a denial-safe primary pick (e.g. first known-for
+  title, or an ungoverned signal) and may keep `numVotes` as an opportunistic upgrade
+  when granted (grants propagate within one poll interval; the user will toggle them
+  in a demo). Added a matching AC and depends-on IMDB-14 (shared `denied` handling —
+  a card query must never fail on a governed field). The mosaic (page header) and
+  monogram floor are unaffected. Amended now, pre-implementation, because changing an
+  unstarted ticket is cheaper than a follow-up ticket against shipped code.
+- **ui-ux-designer** — DES-6 revised for governance; back to `ready-for-dev`. The
+  card-variant poster pick is now denial-safe by construction: primary rule is the
+  **first `knownForTitles` entry** (dataset order — IMDb's own curation, an
+  ungoverned signal); when fetched data carries `numVotes` values (field granted),
+  the pick **opportunistically upgrades** to the client-side max-voted title. Both
+  rules read already-fetched data — no extra GraphQL or OMDb requests, and the
+  degradation is **silent**: cards never render the restricted-field treatment
+  (settled in architecture § Person visuals and recorded in DES-8's "where it
+  deliberately doesn't apply"). The snippet keeps `numVotes` optimistically per
+  architecture § Field-level governance and now co-selects `averageRating` so a
+  strip never empties `rating`. Mosaic (known-for order) and monogram floor
+  untouched.
