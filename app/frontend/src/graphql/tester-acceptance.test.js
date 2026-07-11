@@ -15,8 +15,9 @@
  *      the promise rejects kind 'auth' and fetch is NEVER invoked.
  *   4. Each normalization branch exercised THROUGH execute() (transport
  *      included), not just via normalizeError() unit calls: 401→auth,
- *      403→auth (the live PERMISSION_DENIED status), reject→network,
- *      5xx→network, BAD_REQUEST→bad-request, other→graphql.
+ *      403+PERMISSION_DENIED→denied (updated by IMDB-14; was 'auth' when
+ *      this suite was written), reject→network, 5xx→network,
+ *      BAD_REQUEST→bad-request, other→graphql.
  *   5. Query-key/variable lockstep: distinct variable sets can never collide
  *      in the cache, and builders are pure.
  */
@@ -143,7 +144,12 @@ describe('normalization branches through the real transport', () => {
       kind: 'auth',
     },
     {
-      name: 'HTTP 403 PERMISSION_DENIED (live fieldAuth denial status) → auth',
+      // IMDB-4 verified this arrives as HTTP 403 and (then) normalized it to
+      // 'auth'; IMDB-14 gave governance denials their own kind so a
+      // signed-in user's denial is never presented as a credential problem
+      // (architecture § Field-level governance — 'denied' BEFORE the
+      // HTTP-status rule). This case now asserts the settled contract.
+      name: 'HTTP 403 PERMISSION_DENIED (live fieldAuth denial status) → denied, never auth (IMDB-14)',
       arrange: () =>
         fetchMock.mockResolvedValue(
           graphqlResponse(
@@ -158,7 +164,7 @@ describe('normalization branches through the real transport', () => {
             { status: 403 },
           ),
         ),
-      kind: 'auth',
+      kind: 'denied',
     },
     {
       name: 'fetch rejection (offline/DNS) → network',

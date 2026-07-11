@@ -107,11 +107,15 @@ describe('normalizeError', () => {
     expect(normalizeError(original)).toBe(original);
   });
 
-  it('only ever produces the four documented kinds', () => {
+  it('only ever produces the five documented kinds', () => {
     const samples = [
       clientError({ status: 401 }),
       clientError({ status: 500 }),
       clientError({ status: 200, errors: [{ message: 'x' }] }),
+      clientError({
+        status: 403,
+        errors: [{ message: 'no', extensions: { code: 'PERMISSION_DENIED', deniedFields: ['A.b'] } }],
+      }),
       new TypeError('Failed to fetch'),
       undefined,
       'a string, even',
@@ -119,6 +123,95 @@ describe('normalizeError', () => {
     for (const s of samples) {
       expect(ERROR_KINDS).toContain(normalizeError(s).kind);
     }
+  });
+});
+
+describe('field-level governance → kind "denied" (IMDB-14)', () => {
+  /** The live router's verified denial shape (2026-07-10): HTTP 403, one
+   *  aggregated PERMISSION_DENIED error, extensions.deniedFields. */
+  function denialError(deniedFields, { status = 403 } = {}) {
+    return clientError({
+      status,
+      errors: [
+        {
+          message: `not authorized to read: ${deniedFields.join(', ')}`,
+          extensions: { code: 'PERMISSION_DENIED', deniedFields },
+        },
+      ],
+    });
+  }
+
+  it('normalizes PERMISSION_DENIED to kind "denied" carrying the coordinates', () => {
+    const e = normalizeError(denialError(['Rating.numVotes']));
+    expect(e).toBeInstanceOf(GraphQLLayerError);
+    expect(e.kind).toBe('denied');
+    expect(e.deniedFields).toEqual(['Rating.numVotes']);
+    expect(e.message).toMatch(/not authorized to read/);
+    expect(e.errors).toHaveLength(1);
+  });
+
+  it('ORDERING: a 403 with the PERMISSION_DENIED marker is "denied", never "auth"', () => {
+    // A signed-in user's governance denial arrives as HTTP 403 — the exact
+    // status the HTTP rule maps to 'auth'. The governance rule must win, or
+    // the UI would point the user at a useless re-login.
+    const e = normalizeError(denialError(['Name.birthYear'], { status: 403 }));
+    expect(e.kind).toBe('denied');
+    expect(e.kind).not.toBe('auth');
+  });
+
+  it('ORDERING: a 403 WITHOUT the marker still maps to "auth" (kind reserved for credentials)', () => {
+    expect(normalizeError(clientError({ status: 403 })).kind).toBe('auth');
+    expect(
+      normalizeError(clientError({ status: 403, errors: [{ message: 'forbidden' }] })).kind,
+    ).toBe('auth');
+  });
+
+  it('carries every coordinate of the live aggregated multi-field shape', () => {
+    const e = normalizeError(
+      denialError(['Name.birthYear', 'Name.deathYear', 'Rating.numVotes']),
+    );
+    expect(e.deniedFields).toEqual(['Name.birthYear', 'Name.deathYear', 'Rating.numVotes']);
+  });
+
+  it('unions deniedFields across MULTIPLE errors, deduplicated (defensive against a one-error-per-field shape)', () => {
+    const errors = [
+      { message: 'a', extensions: { code: 'PERMISSION_DENIED', deniedFields: ['Rating.numVotes'] } },
+      { message: 'b', extensions: { code: 'PERMISSION_DENIED', deniedFields: ['Name.birthYear'] } },
+      { message: 'c', extensions: { code: 'PERMISSION_DENIED', deniedFields: ['Name.birthYear', 'Name.deathYear'] } },
+    ];
+    const e = normalizeError(clientError({ status: 403, errors }));
+    expect(e.kind).toBe('denied');
+    expect(e.deniedFields).toEqual(['Rating.numVotes', 'Name.birthYear', 'Name.deathYear']);
+    expect(e.errors).toEqual(errors);
+  });
+
+  it('finds PERMISSION_DENIED nested under the router\'s subgraph-error wrapper', () => {
+    const errors = [
+      {
+        message: "Failed to fetch from Subgraph 'ratings'.",
+        extensions: {
+          errors: [
+            {
+              message: 'not authorized to read: Rating.numVotes',
+              extensions: { code: 'PERMISSION_DENIED', deniedFields: ['Rating.numVotes'] },
+            },
+          ],
+        },
+      },
+    ];
+    const e = normalizeError(clientError({ status: 200, errors }));
+    expect(e.kind).toBe('denied');
+    expect(e.deniedFields).toEqual(['Rating.numVotes']);
+  });
+
+  it('wins over the status rule at ANY status, and never misfires without the code', () => {
+    // Denial marker on a 200 (router evolution) → still 'denied'.
+    expect(normalizeError(denialError(['Rating.numVotes'], { status: 200 })).kind).toBe('denied');
+    // Other codes never produce 'denied'.
+    const e = normalizeError(
+      clientError({ status: 200, errors: [{ message: 'x', extensions: { code: 'BAD_REQUEST' } }] }),
+    );
+    expect(e.kind).toBe('bad-request');
   });
 });
 

@@ -4,10 +4,29 @@
  * query key and the request, so cache identity and what was actually asked
  * for can never drift apart. Errors reach callers as the normalized
  * {kind, message, errors} shape from errors.js.
+ *
+ * FIELD-LEVEL GOVERNANCE (IMDB-14): every queryFn goes through
+ * client.js#executeWithDenials, so a cached result is the envelope
+ * `{ data, deniedFields }` — coordinates the router's transparent redact
+ * mode withheld are already absent from `data` and listed in `deniedFields`
+ * (from extensions.governance.redactedFields; see client.js). Each hook
+ * unwraps the
+ * envelope and returns `deniedFields: string[]` (always an array) alongside
+ * the usual query result, so views apply the two-rule contract — coordinate
+ * in `deniedFields` → the shared restricted treatment; value null/absent and
+ * NOT denied → the view's ordinary missing state — without ever parsing raw
+ * GraphQL errors or `extensions` outside this directory.
+ *
+ * CACHING FOR DENIALS: a degraded result gets `staleTime` 60 s via TanStack
+ * v5's function form (denialScopedStaleTime below); clean results keep the
+ * standard per-operation policy from keys.js. This scopes the freshness cost
+ * to exactly the cache entries a live grant flip can change: within 60 s of a
+ * grant, the next mount/fetch re-sends the optimistic full document and
+ * renders the real value — no redeploy, no code change.
  */
 import { useQuery } from '@tanstack/react-query';
 
-import { execute } from './client.js';
+import { executeWithDenials } from './client.js';
 import { queryKeys, staleTimes } from './keys.js';
 import {
   FACETS_QUERY,
@@ -22,48 +41,91 @@ import {
 /** Page size shared by both paged searches (fixed at 24 in v1 per the URL scheme). */
 export const DEFAULT_PAGE_SIZE = 24;
 
-/** Index freshness (rebuiltAt + counts). */
-export function useSearchInfo(options = {}) {
-  return useQuery({
-    queryKey: queryKeys.searchInfo(),
-    queryFn: () => execute(SEARCH_INFO_QUERY),
-    staleTime: staleTimes.searchInfo,
+/** staleTime for any result with a non-empty deniedFields (ms) — see module docs. */
+export const DENIED_STALE_TIME = 60_000;
+
+/**
+ * Function-form staleTime: 60 s while the cached envelope reports denied
+ * coordinates, the operation's normal staleTime otherwise.
+ */
+export function denialScopedStaleTime(normalStaleTime) {
+  return (query) =>
+    query.state.data?.deniedFields?.length ? DENIED_STALE_TIME : normalStaleTime;
+}
+
+/**
+ * The one useQuery wrapper every hook goes through: queryFn resolves the
+ * {data, deniedFields} envelope, staleTime is denial-scoped, and the returned
+ * result unwraps the envelope (`data` is the operation data, `deniedFields`
+ * is always an array — empty until a fetch reports denials).
+ */
+function useGraphQuery({ queryKey, document, variables, staleTime, enabled = true }, options) {
+  const query = useQuery({
+    queryKey,
+    queryFn: () => executeWithDenials(document, variables),
+    staleTime: denialScopedStaleTime(staleTime),
+    enabled,
     ...options,
   });
+  return {
+    ...query,
+    data: query.data?.data,
+    deniedFields: query.data?.deniedFields ?? [],
+  };
+}
+
+/** Index freshness (rebuiltAt + counts). */
+export function useSearchInfo(options = {}) {
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.searchInfo(),
+      document: SEARCH_INFO_QUERY,
+      staleTime: staleTimes.searchInfo,
+    },
+    options,
+  );
 }
 
 /** Vocabulary facets for filter controls — never hard-code genre lists. */
 export function useFacets(options = {}) {
-  return useQuery({
-    queryKey: queryKeys.facets(),
-    queryFn: () => execute(FACETS_QUERY),
-    staleTime: staleTimes.facets,
-    ...options,
-  });
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.facets(),
+      document: FACETS_QUERY,
+      staleTime: staleTimes.facets,
+    },
+    options,
+  );
 }
 
 /** One title, fully hydrated. Disabled until a tconst exists. */
 export function useTitle(tconst, options = {}) {
   const variables = { tconst };
-  return useQuery({
-    queryKey: queryKeys.title(variables),
-    queryFn: () => execute(TITLE_QUERY, variables),
-    staleTime: staleTimes.title,
-    enabled: Boolean(tconst),
-    ...options,
-  });
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.title(variables),
+      document: TITLE_QUERY,
+      variables,
+      staleTime: staleTimes.title,
+      enabled: Boolean(tconst),
+    },
+    options,
+  );
 }
 
 /** One person, with known-for titles and credits. Disabled until an nconst exists. */
 export function useName(nconst, options = {}) {
   const variables = { nconst };
-  return useQuery({
-    queryKey: queryKeys.name(variables),
-    queryFn: () => execute(NAME_QUERY, variables),
-    staleTime: staleTimes.name,
-    enabled: Boolean(nconst),
-    ...options,
-  });
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.name(variables),
+      document: NAME_QUERY,
+      variables,
+      staleTime: staleTimes.name,
+      enabled: Boolean(nconst),
+    },
+    options,
+  );
 }
 
 /**
@@ -76,13 +138,16 @@ export function useSearchTitles(
   options = {},
 ) {
   const variables = { filter, sort, limit, offset };
-  return useQuery({
-    queryKey: queryKeys.searchTitles(variables),
-    queryFn: () => execute(SEARCH_TITLES_QUERY, variables),
-    staleTime: staleTimes.searchTitles,
-    enabled: Boolean(filter),
-    ...options,
-  });
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.searchTitles(variables),
+      document: SEARCH_TITLES_QUERY,
+      variables,
+      staleTime: staleTimes.searchTitles,
+      enabled: Boolean(filter),
+    },
+    options,
+  );
 }
 
 /** People search, same shape as useSearchTitles with a NameSearchFilter. */
@@ -91,13 +156,16 @@ export function useSearchNames(
   options = {},
 ) {
   const variables = { filter, sort, limit, offset };
-  return useQuery({
-    queryKey: queryKeys.searchNames(variables),
-    queryFn: () => execute(SEARCH_NAMES_QUERY, variables),
-    staleTime: staleTimes.searchNames,
-    enabled: Boolean(filter),
-    ...options,
-  });
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.searchNames(variables),
+      document: SEARCH_NAMES_QUERY,
+      variables,
+      staleTime: staleTimes.searchNames,
+      enabled: Boolean(filter),
+    },
+    options,
+  );
 }
 
 /**
@@ -106,11 +174,14 @@ export function useSearchNames(
  */
 export function useSearch({ query, kinds = null, limit = 20 }, options = {}) {
   const variables = { query, kinds, limit };
-  return useQuery({
-    queryKey: queryKeys.search(variables),
-    queryFn: () => execute(SEARCH_QUERY, variables),
-    staleTime: staleTimes.search,
-    enabled: Boolean(query),
-    ...options,
-  });
+  return useGraphQuery(
+    {
+      queryKey: queryKeys.search(variables),
+      document: SEARCH_QUERY,
+      variables,
+      staleTime: staleTimes.search,
+      enabled: Boolean(query),
+    },
+    options,
+  );
 }

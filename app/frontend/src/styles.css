@@ -326,3 +326,108 @@ body {
     animation: none;
   }
 }
+
+/* ======================================================================== */
+/* ---- RestrictedValue (IMDB-14 / DES-8) — appended section -------------- */
+/* The redaction pill for governance-denied fields. STATIC by design: the   */
+/* hatch never animates — that is the discriminator against loading         */
+/* skeletons, which shimmer. No amber in the pill (amber = focus/activity). */
+/* ======================================================================== */
+
+.restricted-value {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45em;
+  /* Occupies exactly the line box of the text it replaces: same             */
+  /* line-height, baseline-aligned, never taller.                            */
+  line-height: inherit;
+  vertical-align: baseline;
+  cursor: default;
+}
+
+.restricted-value__pill {
+  display: inline-block;
+  position: relative;
+  /* Height tracks the surrounding text's cap height (1em), sitting on the  */
+  /* baseline like a run of redacted characters would.                      */
+  height: 1em;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  /* 45° hairline stripes: 1px lines of --hairline every 3px over --card.   */
+  background: repeating-linear-gradient(
+    45deg,
+    var(--hairline) 0,
+    var(--hairline) 1px,
+    var(--card) 1px,
+    var(--card) 3px
+  );
+  /* Width comes from the inline style (default 3.5em, call-site hint).     */
+}
+
+.restricted-value__lock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+}
+
+.restricted-value--line .restricted-value__lock {
+  /* Leading in the line-level pill, centered in the inline pill. */
+  left: 0.7em;
+  transform: translate(0, -50%);
+}
+
+.restricted-value__word {
+  font-size: 11px;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+/* Visually hidden, present for screen readers:
+   "<Label>: restricted by data governance." */
+.restricted-value__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Tooltip: dark raised card, hairline border, max-width 280px, no arrow.
+   Presentation only (aria-hidden) — never traps focus or blocks neighbors. */
+.restricted-value__tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  width: max-content;
+  max-width: 280px;
+  padding: 0.5rem 0.65rem;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.restricted-value__tooltip-head {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.restricted-value__tooltip-body {
+  display: block;
+  color: var(--muted);
+}
+
+/* ---- end RestrictedValue (IMDB-14 / DES-8) ----------------------------- */
