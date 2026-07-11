@@ -218,3 +218,74 @@ where selecting a result navigates — coordinate with the architect.
     Firebase confined to `auth.js`/`firebase.js`; only network destinations
     are the router (GraphQL module) and sanctioned OMDb image URLs; no
     secrets beyond the sanctioned OMDb key.
+- **developer** — fix round on PR #14 (post-verdict; the tester's verdict
+  above predates these commits, so the changed surfaces are re-reviewable).
+  First **merged `origin/main`** (IMDB-11 chat UI, IMDB-14 redact-mode
+  client, board/design round) into the branch:
+  - *Merge resolution:* `TopBar.jsx` keeps BOTH tickets — compact omnibox
+    slot (DES-2, hidden on `/`) AND concierge toggle (DES-7), tab order
+    wordmark → omnibox → chat toggle → avatar; `styles.css` keeps both
+    appended sections (IMDB-5 search + IMDB-14 RestrictedValue). TopBar is
+    now Router-safe (`useInRouterContext`; the location-dependent slot lives
+    in a child component) because main's chat suites mount AppShell without
+    a Router — outside one it degrades to exactly main's pre-IMDB-5 markup.
+    `chat-authgate.test.jsx` additionally needed the mechanical providers
+    wrapper (MemoryRouter + QueryClient — what main.jsx supplies) since App
+    now owns the route table; zero assertion changes.
+  - *Fixes (adversarially-verified findings; all confirmed genuine):*
+    1. **Mobile ✕** — closes the overlay per DES-2, renders even with an
+       empty input (touch has no Esc), returns focus to the search toggle.
+       In the overlay the ✕ does NOT clear the text (Esc parity; the lifted
+       store keeps the query). Desktop ✕ keeps clear-and-stay semantics.
+    2. **`/` / Cmd/Ctrl+K** — below 720px (compact) opens the overlay and
+       focuses on the next frame (the field was `display:none` when the old
+       `focus()` ran); at desktop widths the handler no longer touches
+       `mobileOpen`, so the two-Esc model holds. Viewport read via
+       `window.matchMedia` at call time.
+    3. **Query text lifted above the route** — `search/searchTextStore.js`
+       (module-level `useSyncExternalStore` store shared by hero + compact);
+       Back-then-refocus resumes per DES-2. Note: the text also survives
+       sign-out/sign-in within a tab (store is module-scoped, not
+       auth-scoped) — flagging for the tester/PO.
+    4. **Deep link `/search?q=`** — SearchPage hydrates the store from the
+       URL (the one route where q is authoritative); the TopBar omnibox
+       shows the query it represents.
+    5. **Governance rewire** — `Rating.numVotes` back in the document
+       (optimistic select; obsolete 403 comment rewritten);
+       `useUniversalSearch` now goes through `executeWithDenials` with the
+       denial-scoped 60 s staleTime and returns `deniedFields`. Votes
+       parenthetical stays opportunistic. LIVE-verified (see below).
+    6. **Panel state machine** — rows-empty + fetch-in-flight renders
+       skeletons, never a false "Nothing matches"; `placeholderData` scoped
+       to the query lineage (prefix relation), so unrelated queries start
+       from the first-open skeleton instead of resurrecting stale rows.
+    7. **compactVotes** — M branch starts at 999,500 (999,600 rendered
+       "1000K").
+    8. **ARIA batch** — (a) `aria-expanded`/`aria-controls` set only while
+       the listbox element exists (chose the gating option, matching the
+       existing "no listbox during skeleton" contract); (b) option ids embed
+       entity ids (tconst/nconst) so `aria-activedescendant` re-announces
+       across result sets; (c) no-results/never-built bodies are polite live
+       regions (`role=status`); (d) overlay close restores focus to the
+       toggle (Esc/✕; pointer-driven closes deliberately don't steal focus);
+       (e) freshness ⓘ per DES-2 "(title attribute is sufficient)": plain
+       `title`, `aria-hidden`, no tabIndex/aria-label — chose the
+       drop-focusability option since the combobox Tab model could never
+       reach it anyway.
+  - *Tester-suite touch (honest note):* `imdb5-acceptance.tester.test.jsx`
+    got a **mechanical seam migration only** — `execute` →
+    `executeWithDenials` envelope (`{data, deniedFields}`) plus the lifted
+    store reset in `beforeEach`; zero assertion changes. The stale numVotes
+    comment in `imdb5-live-search.tester.test.js` corrected. Developer test
+    files rewritten where they locked in the reject-mode contract
+    (`searchHooks.test.jsx` now asserts the optimistic select).
+  - *Verified:* merged combined suite green — frontend 339 passed / 16
+    skipped (live-gated), chat backend 45 passed, `npm run build` green.
+    With `LIVE_ROUTER_TOKEN` (gcloud OIDC): 352 passed / 3 skipped — new
+    `imdb5-live-redaction.test.jsx` proves the updated document through the
+    REAL client and REAL hook: HTTP 200, `numVotes` silently absent
+    per-element, `averageRating` intact, `deniedFields ===
+    ['Rating.numVotes']` out of the hook, `searchInfo` riding along. Dev
+    server serves `/`, `/search?q=`, `/title/:id`, `/person/:id`.
+  - *Still not verified (unchanged):* the signed-in browser flow with a real
+    Firebase ID token, visual eyeballing, real-device <720px overlay.
