@@ -1,7 +1,7 @@
 ---
 id: IMDB-2
 title: Firebase Auth with Google-only sign-in behind an AuthGate
-status: in-review
+status: in-progress
 owner: product-owner
 design: designs/DES-1-marquee-shell-and-sign-in.md
 depends-on: [IMDB-1]
@@ -77,3 +77,35 @@ signed-in user indicator + sign-out affordance in the app shell.
   and DES-1's visual/responsive polish; left for the tester. TopBar ships without
   the chat toggle (DES-7/IMDB-11) and with an empty omnibox slot (DES-2/IMDB-5), by
   design.
+- **tester** — verified against the ACs and DES-1's states. Wrote independent
+  acceptance tests (`src/imdb2-acceptance.tester.test.jsx`, commit `94c9c1a`) that
+  render the real `<App/>` root with `./auth.js` faked at the module seam — no test
+  touches real Firebase. Commands: `npm ci && npm test` → **50/50 pass, exit 0**
+  (clean checkout); `npm run build` → exit 0; `npm run dev` + curl → index serves,
+  `main.jsx`/`SignInScreen.jsx`/`AuthCurtain.jsx` transform. Per-criterion:
+  - AC1 signed-out shows only the sign-in screen (no nav/link/shell, zero fetch(),
+    zero `<img>`, initial focus on the Google button) — **PASS** (jsdom, full App
+    tree).
+  - AC2 sign-in lands in the shell with identity (avatar/Monogram, name, muted
+    email) + working sign-out — **PASS at the module seam; NOT VERIFIED live**
+    (real Google popup needs an interactive browser).
+  - AC3 curtain while resolving, never a flash of the wrong screen — **PASS**
+    (both resolution orders, jsdom); **reload-stays-signed-in NOT VERIFIED live**
+    (real Firebase persistence needs a browser).
+  - AC4 sign-out returns immediately to the sign-in screen, menus discarded —
+    **PASS at the seam; NOT VERIFIED live**.
+  - AC5 Firebase confined to `auth.js`/`firebase.js` (grep: `firebase` imports only
+    in `auth.js`; enforced in-suite by `scaffold-conventions.test.js`) — **PASS**.
+  - AC6 no secret committed; only the public Firebase web config in the diff —
+    **PASS** (diff scan).
+  - DES-1 extras: inline `Couldn't sign in — <reason>. Try again.` for popup-closed
+    /popup-blocked/network with button re-enabled, in-flight spinner + disabled
+    button, UserMenu Esc-close + focus return + Tab trap — **PASS**. Visual fidelity
+    (curtain pulse, dot shimmer, responsive collapse) not eyeballed — NOT VERIFIED.
+  The live Google popup flow cannot be exercised here (no interactive browser), so
+  three criteria are not fully verified → **PR #6 stays a draft**, ticket back to
+  `in-progress`. Human steps to finish verification: `cd app/frontend && npm run
+  dev`, open http://localhost:5173, confirm curtain → sign-in screen; sign in with
+  a Google account and confirm you land in the shell with your name/avatar; reload
+  and confirm you stay signed in (curtain, no re-prompt, no sign-in flash); sign
+  out from the avatar menu and confirm immediate return to the sign-in screen.
