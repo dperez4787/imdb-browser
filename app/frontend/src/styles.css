@@ -1267,3 +1267,118 @@ body {
 }
 
 /* ---- end RestrictedValue (IMDB-14 / DES-8) ----------------------------- */
+
+/* ---- GovernanceBadge (IMDB-16 / DES-7 addendum) — appended section ------ */
+/* Streamed restricted-fields footer at the foot of an assistant message.    */
+/* Adapts DES-8's hatch+lock swatch as a MUTED ANNOTATION LINE (not an inline */
+/* value pill): the assistant's prose is the human layer, the raw coordinates */
+/* are the corroboration. STATIC always — no shimmer, no animation, no amber  */
+/* in the mark: the hatch means WITHHELD, the amber ring is only focus.       */
+/* Renders nothing when there is no governance — zero DOM, zero cost.         */
+/* ======================================================================== */
+
+.chat-governance {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  cursor: default;
+}
+
+/* The recognizable mark: 45° hairline hatch over the card surface with a     */
+/* centered lock, fixed 2em wide — DES-8's redaction-pill recipe verbatim.    */
+.chat-governance__swatch {
+  position: relative;
+  flex: none;
+  width: 2em;
+  height: 1em;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--hairline) 0,
+    var(--hairline) 1px,
+    var(--card) 1px,
+    var(--card) 3px
+  );
+}
+
+.chat-governance__lock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+}
+
+.chat-governance__label {
+  color: var(--muted);
+}
+
+/* Coordinates in inline-code style — the ground-truth corroboration. */
+.chat-governance__coord {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  color: var(--text);
+}
+
+.chat-governance__more {
+  color: var(--muted);
+}
+
+/* Shared amber focus ring (the DES-8 affordance). */
+.chat-governance:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Visually hidden, present for screen readers:
+   "Restricted for your role: Rating.numVotes, Name.birthYear." */
+.chat-governance__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Tooltip: dark raised card, hairline border, max-width 280px, no arrow.
+   Presentation only (aria-hidden) — never traps focus or blocks neighbors. */
+.chat-governance__tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  width: max-content;
+  max-width: 280px;
+  padding: 0.5rem 0.65rem;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.chat-governance__tooltip-head {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chat-governance__tooltip-body {
+  display: block;
+  color: var(--muted);
+}
+
+/* ---- end GovernanceBadge (IMDB-16 / DES-7 addendum) -------------------- */

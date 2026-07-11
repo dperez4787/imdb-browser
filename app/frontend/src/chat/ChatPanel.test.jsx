@@ -348,3 +348,73 @@ describe('conversation persistence (panel closed ≠ conversation lost)', () => 
     expect(screen.getByText('of course')).toBeVisible();
   });
 });
+
+describe('streamed governance badge (IMDB-16 / DES-7 addendum)', () => {
+  const badges = (container) => container.querySelectorAll('.chat-governance');
+  const badge = (container) => container.querySelector('.chat-governance');
+
+  it('absent → appears mid-stream on the first redacted tool event → grows in place → persists on commit', async () => {
+    const { container } = renderSignedIn();
+    fireEvent.click(toggle());
+    await sendMessage('how many votes does Game of Thrones have?');
+
+    // Absent: no governance yet, no badge, no reserved space.
+    expect(badges(container)).toHaveLength(0);
+
+    // First redacted tool event → the badge appears NOW, foot of the still-empty
+    // draft message, before any answer text.
+    await act(async () => last().onTool('query-graphql', { redactedFields: ['Rating.numVotes'] }));
+    expect(badges(container)).toHaveLength(1);
+    expect(badge(container)).toHaveAttribute('data-coordinates', 'Rating.numVotes');
+
+    // Text streams above it; the badge stays.
+    await act(async () => last().onText('The Godfather averages 9.2 stars; vote counts are restricted for your role.'));
+    expect(badges(container)).toHaveLength(1);
+
+    // A second redacted tool call grows the SAME badge's list in place — never a
+    // second badge, deduped union in first-seen order.
+    await act(async () =>
+      last().onTool('query-graphql', { redactedFields: ['Rating.numVotes', 'Name.birthYear'] }),
+    );
+    expect(badges(container)).toHaveLength(1);
+    expect(badge(container)).toHaveAttribute('data-coordinates', 'Rating.numVotes,Name.birthYear');
+
+    // Commit: the badge persists as the committed message's last line (tool
+    // lines and caret drop).
+    await act(async () => last().resolve({ usage: {} }));
+    expect(badges(container)).toHaveLength(1);
+    expect(badge(container)).toHaveAttribute('data-coordinates', 'Rating.numVotes,Name.birthYear');
+    expect(container.querySelector('.chat-caret')).toBeNull();
+    expect(screen.queryByText('Querying the graph…')).toBeNull();
+  });
+
+  it('a message whose tool calls carry no governance renders no badge and reserves no space', async () => {
+    const { container } = renderSignedIn();
+    fireEvent.click(toggle());
+    await sendMessage('what is the title of tt0111161?');
+
+    await act(async () => last().onTool('query-graphql'));
+    await act(async () => last().onText('The Shawshank Redemption.'));
+    await act(async () => last().resolve({ usage: {} }));
+
+    expect(badges(container)).toHaveLength(0);
+    expect(screen.getByText('The Shawshank Redemption.')).toBeVisible();
+  });
+
+  it('discards the badge with the failed draft on error (never orphaned)', async () => {
+    const { container } = renderSignedIn();
+    fireEvent.click(toggle());
+    await sendMessage('votes?');
+
+    await act(async () => last().onTool('query-graphql', { redactedFields: ['Rating.numVotes'] }));
+    expect(badges(container)).toHaveLength(1);
+
+    const err = new Error('Something went wrong while answering.');
+    err.kind = 'upstream';
+    await act(async () => last().reject(err));
+
+    // The draft (and its badge) are discarded; the error notice replaces them.
+    expect(badges(container)).toHaveLength(0);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
