@@ -1,12 +1,12 @@
 ---
 id: IMDB-16
 title: Chat — flag governed fields conversationally, never guess them
-status: ready-for-dev
+status: done
 owner: product-owner
 design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-10, IMDB-11]
-branch: ""
-pr: ""
+branch: "imdb-16-chat-governance-awareness"
+pr: "https://github.com/dperez4787/imdb-browser/pull/21"
 ---
 
 ## Description
@@ -115,3 +115,83 @@ guidance it becomes the best possible explainer of governance.
   event" is satisfied by this message-foot badge driven by the tool event; quote the
   addendum's Behavior section for the verifiable wording. Status →
   **`ready-for-dev`**; `design:` set.
+- **developer** — claimed; branch `imdb-16-chat-governance-awareness`. Implemented
+  all four platform tasks plus the DES-7-addendum badge. Backend (`app/chat/`):
+  - **Task 1 (system prompt)** — `config.js` `SYSTEM_PROMPT` gained a governance
+    rule: on `extensions.governance.redactedFields` name the field(s) plainly, never
+    estimate/infer/guess the values, still answer with what IS available, and note a
+    graph admin can grant access.
+  - **Task 2 (SSE)** — new `governance.js#extractRedactedFields` parses the
+    coordinates out of the `query-graphql` tool result (mcp-graphql returns the
+    router's redact-mode JSON — HTTP 200, no `errors` — as text on its success path).
+    `anthropic.js` now emits the `tool` event *after* the call so it can carry the
+    additive `governance: { redactedFields }` (omitted when nothing was redacted);
+    existing tool-event order/tests unchanged.
+  - **Task 3 (retry hygiene)** — a redaction is fed back as `is_error: false`, so the
+    loop never forces a re-query; prompt reinforces "do not re-run … will not change
+    within this turn". Unit test counts exactly one tool call for a redacted answer.
+  - **Task 4 (NON-NEGOTIABLE passthrough guard)** — strengthened the code comment on
+    `mcp.js#buildMcpEnv` (governance guarantee: user token, never a service identity)
+    and added `governance.test.js` regression test asserting the mcp-graphql
+    `Authorization` header is the requesting user's forwarded Firebase token, varies
+    per user, and matches no service/router/API-key pattern.
+  Frontend (`app/frontend/src/chat/`): new `GovernanceBadge.jsx` (swatch + muted
+  `Restricted for your role:` line + code-style coordinates, ≤3 then `+N more`,
+  hover/focus tooltip with the "it sees exactly what you see / ask again after a
+  grant" copy, SR text, `data-coordinates`, focusable non-button, **zero DOM when no
+  governance**); `useChatSession` unions `onTool`'s new `{ redactedFields }` arg
+  first-seen/deduped and carries `governance` onto the committed message;
+  `chatApi.js` forwards it; `AssistantMessage`/`MessageList` render it as the
+  message's last line (draft foot below the streaming caret, persisted on commit);
+  appended `styles.css` `.chat-governance` section (static hatch, no amber, amber ring
+  on focus only).
+  Verified: `npm ci && npm test` green in both packages — chat **56 pass** (11 new:
+  governance framing with faked MCP, the passthrough guard, prompt assertions, retry
+  hygiene), frontend **350 pass** (11 new: badge lifecycle absent→appears→grows→
+  persists, zero-DOM, tooltip, SSE forwarding); `vite build` green. **Not verified:**
+  the live end-to-end (real router redaction + model prose + the analyst-grant flow)
+  is deferred per user directive — it needs a real `ANTHROPIC_API_KEY` and an
+  interactive Google sign-in; no key was placed anywhere. Draft PR **#21**
+  (https://github.com/dperez4787/imdb-browser/pull/21) opened; status →
+  **`in-review`**. Left as a draft for the tester (`gh pr ready` is theirs).
+- **tester** — verified on `imdb-16-chat-governance-awareness` (PR #21), clean
+  checkouts: `npm ci && npm test` → chat **58 pass / 0 fail** (exit 0), frontend
+  **351 pass / 16 skipped / 0 fail** (exit 0; the 16 skipped are the pre-existing
+  live-router suites gated on a `TOKEN` env var, expected under the deferral);
+  `vite build` green. Per-criterion verdict:
+  - **AC 1 (redacted question: prose contract + badge + no hallucinated numbers)
+    — PASS (unit/wire level), live check DEFERRED.** Prompt contract asserted
+    (names fields plainly / NEVER estimate-infer-guess / offers what IS available
+    / admin can grant — `governance.test.js`); SSE `tool` frame carries
+    `governance.redactedFields` (emit seam + tester wire-level frame test through
+    real HTTP in `acceptance.test.js`, which also proves `roles`/`revision` never
+    reach the stream); badge lifecycle driven through the real components:
+    absent → appears mid-stream on the first redacted tool event → grows deduped
+    in place → persists on commit → zero DOM when clean → discarded with a failed
+    draft (`ChatPanel.test.jsx`, `GovernanceBadge.test.jsx`). The "record one
+    live check on the PR" clause is **not verified** — needs a real
+    `ANTHROPIC_API_KEY` + interactive Google sign-in; deferred to the testing
+    period per the 2026-07-11 directive (steps on the PR).
+  - **AC 2 (analyst grant answers with the real number within ~15s) — NOT
+    VERIFIED (live-only), client half PASS.** Requires the governance console
+    and a live grant flip. What is agent-verifiable passed: the backend is
+    stateless with per-request token passthrough (nothing caches a denial), and
+    the tester history test proves a post-grant clean answer renders no badge
+    while the earlier message keeps its badge.
+  - **AC 3 (token-passthrough regression test) — PASS, independently proven.**
+    Mutation A (service credential inside `buildMcpEnv`) → developer's guard goes
+    red (2 failures). Mutation B (HEADERS overridden at the `StdioClientTransport`
+    env) → the entire suite stayed **green**: the guard did not watch the wire.
+    Gap closed with tester `mcp.passthrough.test.js`: spawns the real mcp-graphql
+    child via the real `createMcpSession` against a loopback capture server and
+    asserts the Authorization header on the wire is `Bearer <requesting user's
+    token>`, varies per user, matches no service pattern; re-ran Mutation B → red
+    (`actual: 'Bearer imdb-router-service-account-token'`). Both mutations
+    reverted; final tree is clean code + green guards.
+  - **AC 4 (at most one query per redacted question) — PASS.** Unit test counts
+    exactly one tool call for a redacted answer; the tool_result is fed back
+    `is_error: false`; prompt forbids re-querying within the turn.
+  Conventions checked: no `fetch()` outside the boundary modules, no committed
+  secrets, badge is presentation-only. Status → **`done`**; PR #21 taken out of
+  draft (`gh pr ready`) — **merge should wait for the live testing period** to
+  record the AC-1 live check and the AC-2 grant flow (exact steps on the PR).

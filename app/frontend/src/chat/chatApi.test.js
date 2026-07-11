@@ -99,6 +99,23 @@ describe('consumeSse — the four contract event types', () => {
     expect(onTool.mock.calls.map(([n]) => n)).toEqual(['introspect-schema', 'query-graphql']);
   });
 
+  it('forwards governance.redactedFields on the tool event, undefined when absent (IMDB-16)', async () => {
+    const onTool = vi.fn();
+    await consumeSse(
+      streamOf([
+        frame('tool', { name: 'query-graphql', governance: { redactedFields: ['Rating.numVotes'] } }),
+        frame('tool', { name: 'query-graphql' }),
+        frame('done', { usage: {} }),
+      ]),
+      { onTool },
+    );
+
+    expect(onTool.mock.calls).toEqual([
+      ['query-graphql', { redactedFields: ['Rating.numVotes'] }],
+      ['query-graphql', undefined],
+    ]);
+  });
+
   it('rejects with the server error kind/message on an error event, keeping earlier text', async () => {
     const onText = vi.fn();
     const promise = consumeSse(
