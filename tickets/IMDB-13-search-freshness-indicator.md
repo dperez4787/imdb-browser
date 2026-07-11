@@ -1,7 +1,7 @@
 ---
 id: IMDB-13
 title: Surface searchInfo.rebuiltAt freshness on search surfaces
-status: ready-for-dev
+status: done
 owner: product-owner
 design: designs/DES-2-universal-search.md
 depends-on: [IMDB-5]
@@ -50,3 +50,4 @@ happens when the value is unavailable.
   unavailable (absence, never a guess). Exported standalone and mounted verbatim in
   DES-3's toolbar, satisfying the reuse criterion. Fetch rule specified (rides the
   first aliased search request, cached 5 min). Nothing unsettled → `ready-for-dev`.
+- **main session** (board bookkeeping, 2026-07-11) — delivered inside IMDB-5 per DES-2 (SearchFreshness footer, never-built state, absolute+relative wording); verified by the IMDB-5 tester and merged with PR #14. Status → done.
