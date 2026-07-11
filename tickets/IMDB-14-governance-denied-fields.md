@@ -1,12 +1,12 @@
 ---
 id: IMDB-14
 title: Governance-denied fields — client 'denied' handling + shared restricted-field treatment
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-8-restricted-field-treatment.md
 depends-on: [IMDB-4]
 branch: "imdb-14-governance-denied-fields"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/13"
 ---
 
 ## Description
@@ -140,3 +140,35 @@ invisible for an hour and wreck the demo.
   DES-8. IMDB-5 runs in parallel; staying strictly inside the existing
   `src/graphql/` files + new `src/components/RestrictedValue.*` files + an appended
   `styles.css` section.
+- **developer** — implemented, `in-review`, PR #13 (draft). **The contract change in
+  the governance-platform notice above landed mid-implementation** and was verified
+  directly against the live router (2026-07-11, policy revision 8): a query selecting
+  `Rating.numVotes` now returns HTTP 200 with `numVotes` absent and
+  `extensions.governance.redactedFields: ["Rating.numVotes"]` — observed verbatim via
+  curl and through the client module. Consequences: the strip-and-retry mechanism was
+  built, then **deleted before landing** (no dead code with an untriggerable fallback);
+  `client.js#executeWithDenials` now reads the governance extension off successful
+  responses (`rawRequest`, because `request()` discards extensions) and resolves
+  `{ data, deniedFields }` in one round trip. Kept per contract: `kind: 'denied'`
+  in `errors.js` as the defensive branch for the residual reject mode
+  (PERMISSION_DENIED before the HTTP-status rule, `deniedFields` unioned across
+  errors — a governance denial never reads as `auth`); full optimistic document every
+  fetch (grant detection); hooks exposing `deniedFields` alongside `data`; 60 s
+  function-form staleTime for degraded results; `denied` non-retryable at TanStack;
+  `RestrictedValue` + `isRestricted` per DES-8 (unchanged by the contract shift),
+  colocated tests, styles as a delimited appended `styles.css` section. Files:
+  `src/graphql/{client,errors,hooks,queryClient}.js` + tests,
+  `src/components/RestrictedValue.{jsx,test.jsx}`, `styles.css`; also updated
+  IMDB-4's `tester-acceptance.test.js` case (403+PERMISSION_DENIED → now `denied`,
+  was `auth`) and `queries.js`'s stale header comment (documents may select governed
+  fields now) — no operation document changed. Verified: `npm ci`/`npm test` green
+  (197 passed, 10 skipped after merging main), `npm run build` green, live suite
+  7/7 through the real client with a gcloud OIDC token — `Rating.numVotes` query →
+  200, field absent, `deniedFields === ['Rating.numVotes']`, ungoverned siblings
+  intact. NOT verified: the live grant-flip AC (user-operated governance console —
+  the remaining live criterion; 60 s staleTime seam tests stand in), browser/Firebase
+  token path (no view consumes the hooks yet — IMDB-7/8 are the consumers), reject
+  mode live (no longer triggerable via queries; unit-tested only). ⚠️ For the
+  architect: `docs/architecture.md` § Field-level governance still specifies
+  strip-and-retry and the 403 shape as primary — needs the redact-mode amendment
+  (not rewritten here; architect-owned).
