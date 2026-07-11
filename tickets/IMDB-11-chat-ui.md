@@ -1,7 +1,7 @@
 ---
 id: IMDB-11
 title: Chat assistant UI in the SPA
-status: in-review
+status: in-progress
 owner: product-owner
 design: designs/DES-7-chat-concierge.md
 depends-on: [IMDB-2, IMDB-10]
@@ -90,3 +90,51 @@ behavior.
   a follow-up before the live demo; (2) assistant-markdown in-app links do plain
   `<a>` navigation until the router ticket lands (no react-router in the app yet),
   which loses the in-memory conversation on click.
+- **tester** — verdict: **4 of 5 criteria PASSED, 1 NOT VERIFIED** → back to
+  `in-progress`; PR #9 **stays a draft** (a not-verified criterion is not a pass —
+  same rule as IMDB-2/IMDB-10). Wrote my own suite rather than re-running the
+  developer's: `src/chat/imdb11-sse.tester.test.js` (SSE boundary vs synthetic
+  ReadableStreams: event ordering, every-byte-boundary splits, mid-UTF-8-char
+  splits, CRLF, malformed/comment/unknown/wrong-shape frames, mid-stream `error`,
+  empty + truncated streams) and `src/chat/imdb11-ui.tester.test.jsx` (DES-7
+  states through the REAL AppShell with chatApi faked at the seam: empty state +
+  the three prompts, shimmer→tool-lines→progressive-text-with-caret→committed
+  answer in stream order, error-with-Retry-replaces-never-duplicates,
+  auth-rejection-no-Retry-composer-disabled, reflow-not-overlay both structurally
+  and in the stylesheet, stateless history resend, New chat). Clean checkout:
+  `npm ci && npm test` in app/frontend → **113 passed, exit 0** (94 developer +
+  19 tester); `npm run build` exit 0. Per criterion:
+  1. *Affordance visible from any signed-in view; answer renders per design incl.
+     streaming* — **PASS at the component/contract level; live authenticated
+     streamed conversation NOT VERIFIED** (needs a real `ANTHROPIC_API_KEY` +
+     interactive Google sign-in). Human steps: `app/chat`: copy `.env.example` →
+     `.env` with a real key, `npm start`; `app/frontend`:
+     `VITE_CHAT_URL=http://localhost:8080 npm run dev`, sign in with Google, open
+     the concierge (💬 or Cmd/Ctrl+/), ask a data question, watch tool lines +
+     progressive text stream in. **Expect the browser demo to fail CORS preflight
+     first** — the backend sends no `Access-Control-*` headers (confirmed by grep
+     of `app/chat/src`; IMDB-10 surface, needs a follow-up ticket or a Vite dev
+     proxy).
+  2. *Chat traffic only to our backend; no Anthropic key in bundle* — **PASS**
+     (structural + bundle evidence): built `dist/` greps **zero** for
+     `anthropic`/`sk-ant`/`api.anthropic.com`; `chatApi.js` is the only fetch
+     site, enforced by the hardened scaffold-conventions test (green). Live
+     browser network capture rides the same demo as #1.
+  3. *Firebase ID token attached; 401 and backend error render designed states* —
+     **PASS, with a REAL cross-boundary check**: booted the actual merged
+     `app/chat` credential-less (`/health` 200); raw `curl` POST with a forged
+     Bearer → real 401 `{"error":{"message":"Invalid or expired token"}}`; then
+     `CHAT_INTEGRATION=1 VITE_CHAT_URL=http://localhost:8787 npx vitest run
+     src/chat/chatApi.integration.test.jsx` (jsdom — no browser automation here):
+     the panel's real fetch hit the real backend and rendered the designed
+     auth-rejection state (no Retry, composer disabled) — 2 passed. Backend-error
+     state + Retry-replaces verified in my component tests.
+  4. *Session history per design/contract* — **PASS**: full client-held history
+     re-sent newest-last (stateless), 20-msg/16 KB caps at the boundary, in-memory
+     per session, New chat clears in one click.
+  5. *Signed-out users never see the chat UI* — **PASS** through the real App
+     composition root: signed out, no toggle/panel/dock in the DOM; sign-out
+     removes chat UI and its session.
+  Conventions: no `fetch()` outside the sanctioned boundary, no secrets in the
+  diff, ES modules — all green. The developer's Log/PR claims all **checked out
+  accurately**, including its self-reported gaps and the CORS blocker.
