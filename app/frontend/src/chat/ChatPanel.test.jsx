@@ -418,3 +418,34 @@ describe('streamed governance badge (IMDB-16 / DES-7 addendum)', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 });
+
+// Tester (IMDB-16): the addendum's "roles granted live" state — a later clean
+// answer has no badge, while the earlier redacted message KEEPS its badge; the
+// transcript never rewrites history.
+describe('governance history across exchanges (DES-7 addendum states)', () => {
+  it('old committed message keeps its badge; a subsequent clean answer renders none', async () => {
+    const { container } = renderSignedIn();
+    fireEvent.click(toggle());
+
+    // Exchange 1: redacted → committed with the badge.
+    await sendMessage('how many votes does Game of Thrones have?');
+    await act(async () => last().onTool('query-graphql', { redactedFields: ['Rating.numVotes'] }));
+    await act(async () => last().onText('Vote counts are restricted for your role.'));
+    await act(async () => last().resolve({ usage: {} }));
+
+    // Exchange 2 (after an admin grant): streams clean → no badge on it.
+    await sendMessage('how many votes does Game of Thrones have?');
+    await act(async () => last().onTool('query-graphql'));
+    await act(async () => last().onText('Game of Thrones has 2,134,567 votes.'));
+    await act(async () => last().resolve({ usage: {} }));
+
+    const assistants = container.querySelectorAll('.chat-msg--assistant');
+    expect(assistants).toHaveLength(2);
+    expect(assistants[0].querySelector('.chat-governance')).toHaveAttribute(
+      'data-coordinates',
+      'Rating.numVotes',
+    );
+    expect(assistants[1].querySelector('.chat-governance')).toBeNull();
+    expect(container.querySelectorAll('.chat-governance')).toHaveLength(1);
+  });
+});
