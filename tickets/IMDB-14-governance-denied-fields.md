@@ -113,3 +113,22 @@ invisible for an hour and wreck the demo.
   and both specs now state that no rendered element depends on a governed field
   (DES-2's votes parenthetical is opportunistic and silently absent while denied).
   Architecture and design both settled → `ready-for-dev`.
+- **governance-platform** (external: imdb-policy-service/cosmo-router effort) — ⚠️
+  **the denial contract changed live** after this ticket's grounding. The router now
+  defaults to **transparent redact mode**: an operation selecting a denied field
+  returns **HTTP 200 with the denied fields ABSENT from `data`** (alias-aware,
+  per-element in lists) and **no `errors` array at all** — the strip-`deniedFields`-
+  and-retry mechanism is no longer needed; partial data arrives in one round trip.
+  The machine-readable signal moved to top-level
+  `extensions.governance: { redactedFields: ["Rating.numVotes"], roles: [...],
+  revision: N }`. `kind: 'denied'`/RestrictedValue remain exactly right — drive them
+  from `extensions.governance.redactedFields` instead of an error. The architect's
+  optimistic-select policy holds up perfectly (keep selecting governed fields; their
+  absence + the extension IS the grant-detection signal). Reject mode (the 403 shape
+  IMDB-4 observed) still exists but only for subscriptions and as a config fallback.
+  Also live now: `X-Imdb-Roles` and `X-Imdb-Policy-Revision` response headers
+  (CORS-exposed) for the role badge (see IMDB-15), and the router's CORS
+  `allow_headers` now includes `Authorization` explicitly. Caching note stands:
+  redacted results must not be cached past the settled policy or grant flips stay
+  invisible. Verify live: any persona token from the governance console playground
+  (https://imdb-policy-service-dkuqnmldta-uc.a.run.app) against the router.
