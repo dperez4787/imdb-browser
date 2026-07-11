@@ -1,12 +1,12 @@
 ---
 id: IMDB-7
 title: Title detail page
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-4-title-detail.md
 depends-on: [IMDB-4, IMDB-5, IMDB-14]
 branch: "imdb-7-title-detail-page"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/25"
 ---
 
 ## Description
@@ -101,3 +101,31 @@ before and after person pages exist.
   files (`titleQueries.js`/`titleHooks.js`) — existing `queries.js`/`hooks.js`
   untouched; genre chips render as links to `/titles?genres=…` from day one per
   the coordination directive (IMDB-6's route lands independently).
+- **developer** — implemented; `in-review`, PR #25 (draft).
+  What changed: `src/title/` filled in — `TitlePage.jsx` (state switch, doc
+  title, scroll reset), `TitleHeader.jsx` (poster 260×390, fact line, episode
+  context), `RatingBlock.jsx` (the amended three-way governed votes slot),
+  `GenreChips.jsx` (real `/titles?genres=…` links), `CreditGroup.jsx` +
+  `PersonEntity.jsx` (non-interactive pre-IMDB-8 chips, `data-nconst` upgrade
+  seam), `PageStates.jsx` (NotFoundState/ErrorState, placed for DES-5 reuse),
+  `format.js` (formatters + `groupCredits`); new `src/graphql/titleQueries.js`
+  + `titleHooks.js` (optimistic `numVotes`, own `titleDetail` cache key,
+  denial-scoped staleTime); one appended `styles.css` section incl. the 720px
+  reflow; colocated tests (41 new, all green; full suite 416 pass / 17
+  pre-existing env-gated skips; build green).
+  Live-verified (gcloud OIDC token, rev 8, through the page's real document):
+  tt0068646 → averageRating present, numVotes absent +
+  `redactedFields:["Rating.numVotes"]`, 22 principals / 10 categories;
+  unknown id → `title: null`, no error.
+  Honest gaps: (1) browser click-through deferred per the user's directive —
+  direct-load, reflow, and live grant-flip not watched in a real browser;
+  (2) `App.test.jsx`'s `/title` block was updated (it pinned the placeholder
+  this ticket replaces) — the one shared-file edit, flagged for the IMDB-6
+  developer; (3) DES-4's wireframe shows a merged "CAST" header but its
+  normative text says headers are the data's category words — implemented the
+  text (ACTOR/ACTRESS as their own groups filling the cast slot); designer
+  may want a merged-cast follow-up; (4) the pre-existing `useTitle`/
+  `TITLE_QUERY` in hooks.js/queries.js are now superseded for this page but
+  untouched per the partition — candidates for cleanup once IMDB-6 lands;
+  (5) "Search instead" focuses the omnibox by dispatching the DES-1 global
+  `/` shortcut rather than new plumbing into `search/` files.
