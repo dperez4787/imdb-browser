@@ -1,7 +1,7 @@
 ---
 id: IMDB-4
 title: GraphQL client layer for the SPA
-status: in-progress
+status: done
 owner: product-owner
 depends-on: [IMDB-1, IMDB-2, IMDB-3]
 branch: "imdb-4-graphql-client-layer"
@@ -143,3 +143,4 @@ and IMDB-2's auth (the credential presumably derives from the signed-in Firebase
   therefore STAYS A DRAFT and the ticket returns to `in-progress`, same
   precedent as IMDB-2/IMDB-10 — the user may judge the live evidence sufficient
   and merge.
+- **product-owner** — status → `done`: PR #8 merged by the user (directive 2026-07-11 — human-only live criteria are deferred to the upcoming testing period, assume-works).
