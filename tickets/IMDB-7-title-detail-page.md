@@ -1,11 +1,11 @@
 ---
 id: IMDB-7
 title: Title detail page
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-4-title-detail.md
 depends-on: [IMDB-4, IMDB-5, IMDB-14]
-branch: ""
+branch: "imdb-7-title-detail-page"
 pr: ""
 ---
 
@@ -88,3 +88,16 @@ before and after person pages exist.
   header tab order (tooltip on focus). No open design question remains; the
   restricted-treatment component itself ships under IMDB-14 (depends-on already
   present).
+- **developer** — claimed; `in-progress` on branch `imdb-7-title-detail-page`.
+  Live-router shape verified before writing code (2026-07-11, gcloud identity
+  token): `title(tconst:)` returns `null` for an unknown id (not-found ≠ error,
+  as DES-4 requires), `principals` carries every crew category incl. director/
+  writer entries (so credit groups are principals-driven, no separate
+  directors/writers selection needed), `episode { seasonNumber episodeNumber
+  series { … } }` hydrates (tt0959621), and `Rating.numVotes` is redacted at
+  policy revision 8 with the coordinate in
+  `extensions.governance.redactedFields` while `averageRating` arrives (9.2 for
+  tt0068646). Per the IMDB-6 file partition, the title query gets NEW graphql
+  files (`titleQueries.js`/`titleHooks.js`) — existing `queries.js`/`hooks.js`
+  untouched; genre chips render as links to `/titles?genres=…` from day one per
+  the coordination directive (IMDB-6's route lands independently).
