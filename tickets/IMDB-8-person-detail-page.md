@@ -1,12 +1,12 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-5-person-detail.md
 depends-on: [IMDB-5, IMDB-7, IMDB-14]
 branch: "imdb-8-person-detail-page"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/27"
 ---
 
 ## Description
@@ -121,3 +121,37 @@ filmography organization — by category? known-for first?), how title entries d
     normalizes the 403 to kind `denied` and the page shows the shared ErrorState
     with Retry — degraded but never blank; per DES-5 that mode reaching a query is
     itself the error case.
+- **developer** — implemented; draft PR
+  https://github.com/dperez4787/imdb-browser/pull/27 → `in-review`.
+  - New: `src/graphql/personQueries.js` + `personHooks.js` (envelope +
+    denial-scoped 60 s staleTime, mirroring titleHooks); `src/people/`
+    PersonHeader / KnownForStrip / FilmographyGroup / FilmographyRow /
+    personFormat.js (+ tests); PersonPage.jsx replaces the IMDB-5 placeholder on
+    the same route (no App.jsx change needed). Styles appended at the end of
+    styles.css (720px reflow: header stacks, strip scrolls horizontally inside
+    its own box, rating column drops).
+  - Sanctioned cross-ticket edits: `src/title/PersonEntity.jsx` span → Link
+    (the upgrade seam IMDB-7 reserved; TitlePage.test.jsx updated to match) and
+    `src/title/PageStates.jsx` NotFoundState gained a `subject` prop ('title'
+    default, 'person' here); App.test.jsx's person-route test now expects the
+    real page.
+  - Governance choice (per architecture § Field-level governance): rely on the
+    redact-mode `deniedFields` envelope — one round trip, no fallback document,
+    no retry (denial-derived documents are explicitly retired there). Observed
+    live through the shipped document for nm0000199: HTTP 200 redact mode,
+    `redactedFields [Name.birthYear, Name.deathYear, Rating.numVotes]`, page
+    renders with the line-level restricted lifespan. Residual reject-mode 403
+    (platform config fallback) would render the designed ErrorState, not a
+    blank page.
+  - Verified: 47 files / 532 Vitest tests green (7 opt-in live suites skipped);
+    `npm run build` clean; live router checks for nm0000199 (redact behavior,
+    dataset-order known-for, curated credits) and an unknown nconst
+    (`name: null`, no error). Under parallel load two unrelated test files
+    (`useTitleSearch`, `main`) flaked on waitFor timeouts; both pass in
+    isolation and the final clean full run was green.
+  - NOT verified (honest gaps): real-browser signed-in flow, 720px visual
+    reflow, tooltip interactions, and the live grant-flip demo — deferred to
+    the human testing period per the 2026-07-11 directive. Known data-layer
+    caveat for the tester/product-owner: the filmography is `Name.credits`,
+    the router's curated credit edge capped at 50 entries (prolific people
+    have more raw principal rows behind `principalsByName`).
