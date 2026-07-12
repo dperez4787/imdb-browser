@@ -4,7 +4,7 @@
  * missing/404 → deterministic fallback-art swap — never a broken image.
  */
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import FallbackArt from './FallbackArt.jsx';
 import PosterImage, { posterUrl } from './PosterImage.jsx';
@@ -39,6 +39,20 @@ describe('PosterImage', () => {
     const { container } = render(<PosterImage title="No Id" />);
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('.fallback-art')).not.toBeNull();
+  });
+
+  it('reports settle to ladder parents (IMDB-9): onLoad fires, onError fires AND still swaps to FallbackArt', () => {
+    const onLoad = vi.fn();
+    const onError = vi.fn();
+    const a = render(<PosterImage tconst="tt1" title="Loads" onLoad={onLoad} onError={onError} />);
+    fireEvent.load(a.container.querySelector('img'));
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+
+    const b = render(<PosterImage tconst="tt2" title="Fails" onError={onError} />);
+    fireEvent.error(b.container.querySelector('img'));
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(b.container.querySelector('.fallback-art')).not.toBeNull(); // internal swap unchanged
   });
 });
 

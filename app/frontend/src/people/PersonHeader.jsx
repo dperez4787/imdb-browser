@@ -2,12 +2,15 @@
  * PersonHeader (IMDB-8, DES-5): the PersonVisual slot + name (h1) + lifespan
  * line + muted professions (max 3).
  *
- * PersonVisual is the square 160px identity slot; in this ticket it renders
- * the Monogram disc (deterministic hue from the nconst, initials from the
- * name) — generated, never fetched, so it CANNOT fail and no OMDb request is
- * ever made for a person. DES-6 may upgrade the slot's internals (known-for
- * poster mosaic) without changing this layout — the slot's box is the
- * contract. Decorative: aria-hidden, not focusable.
+ * PersonVisual is the square 160px identity slot. Since IMDB-9 (DES-6) it
+ * renders the KNOWN-FOR POSTER MOSAIC — the person shown as their work —
+ * inside the exact box DES-5 reserved for the Monogram, so the upgrade is
+ * zero layout change by construction. The Monogram disc is still the first
+ * paint and the floor of the whole degradation ladder (≤1 poster resolvable
+ * → the disc, each failed tile → FallbackArt; see KnownForMosaic.jsx), and
+ * the mosaic issues at most 4 lazy OMDb requests per page view. Decorative:
+ * aria-hidden, not focusable, not clickable — the KnownForStrip below is the
+ * interactive version of the same titles.
  *
  * The LIFESPAN LINE is the governed slot (`Name.birthYear`/`Name.deathYear`,
  * denied to everyone at policy rev 8). Its states come from
@@ -30,7 +33,7 @@
  * "revealed-absent" case).
  */
 import RestrictedValue from '../components/RestrictedValue.jsx';
-import Monogram from '../Monogram.jsx';
+import PersonVisual from './PersonVisual.jsx';
 import {
   BIRTH_YEAR_COORDINATE,
   DEATH_YEAR_COORDINATE,
@@ -74,7 +77,7 @@ export default function PersonHeader({ person, deniedFields }) {
   return (
     <header className="person-header">
       <div className="person-header__visual" aria-hidden="true">
-        <Monogram text={person.primaryName} seed={person.nconst} size={160} />
+        <PersonVisual person={person} treatment="mosaic" size={160} />
       </div>
       <div className="person-header__main">
         <h1 className="person-header__name">{person.primaryName}</h1>
