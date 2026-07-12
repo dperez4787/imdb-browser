@@ -1,7 +1,7 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: in-review
+status: done
 owner: product-owner
 design: designs/DES-5-person-detail.md
 depends-on: [IMDB-5, IMDB-7, IMDB-14]
@@ -155,3 +155,68 @@ filmography organization — by category? known-for first?), how title entries d
     caveat for the tester/product-owner: the filmography is `Name.credits`,
     the router's curated credit edge capped at 50 entries (prolific people
     have more raw principal rows behind `principalsByName`).
+- **tester** — verdict: **all agent-verifiable acceptance criteria PASS** →
+  `done`, PR #27 lifted from draft. Gap suite added (11 tests,
+  `src/people/imdb8-acceptance.tester.test.jsx`) on top of the developer's
+  already-broad coverage; per-criterion:
+  - *Stable shareable URL / direct load* — **pass**. `/person/:nconst` in the
+    App route table (App.test.jsx), direct-entry render exercised in both
+    suites; real-browser signed-in load stays deferred per the 2026-07-11
+    directive.
+  - *Placeholder identity + hydration through the router* — **pass**. Monogram
+    in the visual slot, no `<img>` in the header ever; one
+    `PERSON_DETAIL_QUERY` per view through `executeWithDenials`. Live
+    (nm0000199): `knownForTitles` 4 hydrated, `credits` exactly 50 (the
+    recorded cap).
+  - *Governed lifespan (amended AC)* — **pass** (agent-verifiable portion).
+    Full DES-5 matrix now covered at the DOM level all four ways: both denied
+    → line-level pill + RESTRICTED; birth-only denied → `▨▨🔒▨▨ – 2015`
+    inline pill with the real year beside it (tester gap test); death-only
+    denied → `1940 – ▨▨🔒▨▨`; denied-beside-genuinely-absent → one pill, the
+    absent slot silent (tester gap test); null-and-not-denied → NO line and
+    NO pill, even with `Rating.numVotes` denied elsewhere in the document —
+    the two families are structurally distinct in the DOM (pairwise signature
+    test). Page renders fully under denial, never an error. Grant-flip
+    mechanism verified (optimistic select + denial-scoped 60 s staleTime +
+    value-wins rule renders real years through the same code path); the live
+    console-flip demo itself is human-only, not verified, non-blocking per
+    the directive.
+  - *Known-for strip has zero `numVotes` dependency* — **pass**. Dataset
+    order under BOTH governance states (developer: redacted; tester gap test:
+    granted values present with vote counts deliberately inverted — no
+    re-rank, no votes rendered), plus a source-level pin that no rendering
+    file in `src/people/` references `numVotes` in code. Live: the strip's
+    query returns HTTP 200 with `numVotes` selected and redacted — no query
+    this page issues fails on a governed field.
+  - *720px reflow* — **pass** at the stylesheet level (IMDB-7 precedent, 4
+    pin tests: header single-column + centered, strip `overflow-x: auto` in
+    its own box, rating column dropped, `minmax(0, …)` tracks at every
+    width). Real-browser visual reflow: **not verified**, deferred per the
+    directive.
+  - *Cross-navigation both directions* — **pass**, as observed route changes,
+    not just hrefs (tester gap tests: filmography click → title route;
+    PersonEntity chip click → the real person page mounts and fetches). The
+    IMDB-7 title suites all green after the chip upgrade — no regression.
+  - *Not-found vs error vs loading distinct* — **pass**. Developer's tests
+    cover all three; live probe `nm9999999999` → HTTP 200 `{name: null}`, no
+    GraphQL error, confirming the split holds on the wire.
+  - *AuthGate* — **pass** (route renders inside the gate; App.test.jsx
+    exercises the signed-in requirement on this route).
+  - Clean checkout: `npm ci && npm test && npm run build` → 543 tests passed,
+    build clean, exit 0. One parallel-run flake in the pre-existing
+    `useTitleSearch.test.jsx` (one of the two known waitFor flakes, untouched
+    by this PR) — passes in isolation and the final full run was green.
+  - **Governance mode observed live: transparent REDACT** (HTTP 200,
+    `extensions.governance.redactedFields: [Name.birthYear, Name.deathYear,
+    Rating.numVotes]`, policy revision 8) — the mode the developer reported;
+    no reject-mode 403 seen this session. Had reject appeared, the page's
+    designed ErrorState path is covered by the error-state test (environment,
+    not code).
+  - Note for product-owner/designer, beside the recorded 50-cap: live
+    `Name.credits` for nm0000199 DOES include `archive_footage` entries (2 of
+    50), contrary to the developer's "no archive-footage noise" note. Not an
+    AC — the page renders them correctly as their own data-worded group —
+    but the curated-edge description in the Log overstates the curation.
+  - NOT verified (human testing period, non-blocking per directive):
+    real-browser signed-in flow, visual 720px reflow, tooltip interactions,
+    live grant-flip demo.
