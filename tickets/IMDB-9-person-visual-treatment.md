@@ -1,11 +1,11 @@
 ---
 id: IMDB-9
 title: Person visual treatment — known-for poster mosaic vs placeholder
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-6-person-visual-treatment.md
 depends-on: [IMDB-5, IMDB-8, IMDB-14]
-branch: ""
+branch: "imdb-9-person-visual-treatment"
 pr: ""
 ---
 
@@ -101,3 +101,8 @@ IMDB-5 and IMDB-8.
   architecture § Field-level governance and now co-selects `averageRating` so a
   strip never empties `rating`. Mosaic (known-for order) and monogram floor
   untouched.
+- **developer** — claimed; branch `imdb-9-person-visual-treatment` off main.
+  Implementing the revised DES-6 decision: KnownForMosaic in the PersonHeader
+  slot (same 160px box, ladder down to the Monogram floor), the denial-safe
+  card-variant pick + poster+badge treatment as `PersonVisual` in
+  `src/people/`, autocomplete untouched (Monogram, 0 image requests).
