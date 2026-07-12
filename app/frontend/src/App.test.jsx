@@ -123,10 +123,19 @@ describe('route table (docs/architecture.md — Frontend routing & URL scheme)',
     expect(await screen.findByText(/Couldn’t load this title/)).toBeVisible();
   });
 
-  it('/person/:nconst renders the placeholder detail route (until IMDB-8)', () => {
+  it('/person/:nconst renders the person detail page (IMDB-8)', async () => {
+    // jsdom implements no layout; the page's DES-5 scroll reset needs a stub.
+    window.scrollTo = vi.fn();
     renderApp(['/person/nm0000338']);
     signIn();
-    expect(screen.getByRole('heading', { name: 'Person nm0000338' })).toBeVisible();
+    // The real detail page mounts: its loading skeleton, not the old
+    // placeholder heading.
+    expect(screen.getByRole('status', { name: 'Loading person' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Person nm0000338' })).toBeNull();
+    // getIdToken is mocked to undefined here, so the query settles into the
+    // page's designed error state (signed-out guard, kind 'auth', no retry) —
+    // awaited so the state update lands inside the test.
+    expect(await screen.findByText(/Couldn’t load this person/)).toBeVisible();
   });
 
   it('/search?q=… renders the reserved results placeholder with the query', () => {
