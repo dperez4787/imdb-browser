@@ -1,12 +1,12 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: ready-for-dev
+status: done
 owner: product-owner
 design: designs/DES-5-person-detail.md
 depends-on: [IMDB-5, IMDB-7, IMDB-14]
-branch: ""
-pr: ""
+branch: "imdb-8-person-detail-page"
+pr: "https://github.com/dperez4787/imdb-browser/pull/27"
 ---
 
 ## Description
@@ -95,3 +95,128 @@ filmography organization — by category? known-for first?), how title entries d
   architecture § Field-level governance; no rendered element on this page depends
   on one. No open design question remains (data-layer ordering rides depends-on
   IMDB-14 as before).
+- **developer** — claimed; branch `imdb-8-person-detail-page`. Live-introspection
+  findings before writing the query (2026-07-12, policy revision 8), correcting
+  DES-5's Data needs for the designer:
+  - Root field is `name(nconst: ID!)`, not `name(id:)`; the entity key is `nconst`,
+    there is no `Name.id`. Unknown nconst resolves `name: null` on HTTP 200 with no
+    GraphQL error — same not-found-vs-error split as `title`.
+  - `primaryProfessions` (plural), not `primaryProfession`.
+  - **Assumption B confirmed**: `Name.credits: [Principal!]!` exists and hydrates
+    in the same query — `Principal { ordering category job characters title }` all
+    present. Caveat found live: `credits` is a curated set **capped at 50 entries**
+    (no tvEpisode/archive-footage noise; Al Pacino returns exactly 50 of 200+ raw
+    principal rows). The root `principalsByName(nconst, limit!, offset!)` serves
+    the full raw principals table (episode-level rows, archive_footage) but is
+    mandatory-paginated and noisy — wrong fit for DES-5's "renders fully, no
+    pagination" filmography, so this page uses `credits` and accepts the 50-cap.
+    Flagged for product-owner/designer as a data-layer fact, not hidden.
+  - Governance observed live for `nm0000199`: **transparent redact mode** — HTTP
+    200, no errors, `birthYear`/`deathYear` absent from data,
+    `extensions.governance.redactedFields: [Name.birthYear, Name.deathYear,
+    Rating.numVotes]`. The page therefore selects governed fields optimistically
+    and relies on the redact-mode `deniedFields` envelope (architecture § Field-level
+    governance: one round trip; a denial-derived fallback document is explicitly
+    retired there). Under the residual reject-mode config fallback, errors.js
+    normalizes the 403 to kind `denied` and the page shows the shared ErrorState
+    with Retry — degraded but never blank; per DES-5 that mode reaching a query is
+    itself the error case.
+- **developer** — implemented; draft PR
+  https://github.com/dperez4787/imdb-browser/pull/27 → `in-review`.
+  - New: `src/graphql/personQueries.js` + `personHooks.js` (envelope +
+    denial-scoped 60 s staleTime, mirroring titleHooks); `src/people/`
+    PersonHeader / KnownForStrip / FilmographyGroup / FilmographyRow /
+    personFormat.js (+ tests); PersonPage.jsx replaces the IMDB-5 placeholder on
+    the same route (no App.jsx change needed). Styles appended at the end of
+    styles.css (720px reflow: header stacks, strip scrolls horizontally inside
+    its own box, rating column drops).
+  - Sanctioned cross-ticket edits: `src/title/PersonEntity.jsx` span → Link
+    (the upgrade seam IMDB-7 reserved; TitlePage.test.jsx updated to match) and
+    `src/title/PageStates.jsx` NotFoundState gained a `subject` prop ('title'
+    default, 'person' here); App.test.jsx's person-route test now expects the
+    real page.
+  - Governance choice (per architecture § Field-level governance): rely on the
+    redact-mode `deniedFields` envelope — one round trip, no fallback document,
+    no retry (denial-derived documents are explicitly retired there). Observed
+    live through the shipped document for nm0000199: HTTP 200 redact mode,
+    `redactedFields [Name.birthYear, Name.deathYear, Rating.numVotes]`, page
+    renders with the line-level restricted lifespan. Residual reject-mode 403
+    (platform config fallback) would render the designed ErrorState, not a
+    blank page.
+  - Verified: 47 files / 532 Vitest tests green (7 opt-in live suites skipped);
+    `npm run build` clean; live router checks for nm0000199 (redact behavior,
+    dataset-order known-for, curated credits) and an unknown nconst
+    (`name: null`, no error). Under parallel load two unrelated test files
+    (`useTitleSearch`, `main`) flaked on waitFor timeouts; both pass in
+    isolation and the final clean full run was green.
+  - NOT verified (honest gaps): real-browser signed-in flow, 720px visual
+    reflow, tooltip interactions, and the live grant-flip demo — deferred to
+    the human testing period per the 2026-07-11 directive. Known data-layer
+    caveat for the tester/product-owner: the filmography is `Name.credits`,
+    the router's curated credit edge capped at 50 entries (prolific people
+    have more raw principal rows behind `principalsByName`).
+- **tester** — verdict: **all agent-verifiable acceptance criteria PASS** →
+  `done`, PR #27 lifted from draft. Gap suite added (11 tests,
+  `src/people/imdb8-acceptance.tester.test.jsx`) on top of the developer's
+  already-broad coverage; per-criterion:
+  - *Stable shareable URL / direct load* — **pass**. `/person/:nconst` in the
+    App route table (App.test.jsx), direct-entry render exercised in both
+    suites; real-browser signed-in load stays deferred per the 2026-07-11
+    directive.
+  - *Placeholder identity + hydration through the router* — **pass**. Monogram
+    in the visual slot, no `<img>` in the header ever; one
+    `PERSON_DETAIL_QUERY` per view through `executeWithDenials`. Live
+    (nm0000199): `knownForTitles` 4 hydrated, `credits` exactly 50 (the
+    recorded cap).
+  - *Governed lifespan (amended AC)* — **pass** (agent-verifiable portion).
+    Full DES-5 matrix now covered at the DOM level all four ways: both denied
+    → line-level pill + RESTRICTED; birth-only denied → `▨▨🔒▨▨ – 2015`
+    inline pill with the real year beside it (tester gap test); death-only
+    denied → `1940 – ▨▨🔒▨▨`; denied-beside-genuinely-absent → one pill, the
+    absent slot silent (tester gap test); null-and-not-denied → NO line and
+    NO pill, even with `Rating.numVotes` denied elsewhere in the document —
+    the two families are structurally distinct in the DOM (pairwise signature
+    test). Page renders fully under denial, never an error. Grant-flip
+    mechanism verified (optimistic select + denial-scoped 60 s staleTime +
+    value-wins rule renders real years through the same code path); the live
+    console-flip demo itself is human-only, not verified, non-blocking per
+    the directive.
+  - *Known-for strip has zero `numVotes` dependency* — **pass**. Dataset
+    order under BOTH governance states (developer: redacted; tester gap test:
+    granted values present with vote counts deliberately inverted — no
+    re-rank, no votes rendered), plus a source-level pin that no rendering
+    file in `src/people/` references `numVotes` in code. Live: the strip's
+    query returns HTTP 200 with `numVotes` selected and redacted — no query
+    this page issues fails on a governed field.
+  - *720px reflow* — **pass** at the stylesheet level (IMDB-7 precedent, 4
+    pin tests: header single-column + centered, strip `overflow-x: auto` in
+    its own box, rating column dropped, `minmax(0, …)` tracks at every
+    width). Real-browser visual reflow: **not verified**, deferred per the
+    directive.
+  - *Cross-navigation both directions* — **pass**, as observed route changes,
+    not just hrefs (tester gap tests: filmography click → title route;
+    PersonEntity chip click → the real person page mounts and fetches). The
+    IMDB-7 title suites all green after the chip upgrade — no regression.
+  - *Not-found vs error vs loading distinct* — **pass**. Developer's tests
+    cover all three; live probe `nm9999999999` → HTTP 200 `{name: null}`, no
+    GraphQL error, confirming the split holds on the wire.
+  - *AuthGate* — **pass** (route renders inside the gate; App.test.jsx
+    exercises the signed-in requirement on this route).
+  - Clean checkout: `npm ci && npm test && npm run build` → 543 tests passed,
+    build clean, exit 0. One parallel-run flake in the pre-existing
+    `useTitleSearch.test.jsx` (one of the two known waitFor flakes, untouched
+    by this PR) — passes in isolation and the final full run was green.
+  - **Governance mode observed live: transparent REDACT** (HTTP 200,
+    `extensions.governance.redactedFields: [Name.birthYear, Name.deathYear,
+    Rating.numVotes]`, policy revision 8) — the mode the developer reported;
+    no reject-mode 403 seen this session. Had reject appeared, the page's
+    designed ErrorState path is covered by the error-state test (environment,
+    not code).
+  - Note for product-owner/designer, beside the recorded 50-cap: live
+    `Name.credits` for nm0000199 DOES include `archive_footage` entries (2 of
+    50), contrary to the developer's "no archive-footage noise" note. Not an
+    AC — the page renders them correctly as their own data-worded group —
+    but the curated-edge description in the Log overstates the curation.
+  - NOT verified (human testing period, non-blocking per directive):
+    real-browser signed-in flow, visual 720px reflow, tooltip interactions,
+    live grant-flip demo.

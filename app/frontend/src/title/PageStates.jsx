@@ -1,10 +1,12 @@
 /**
  * Shared page-level states for detail pages (IMDB-7, DES-4 "States") —
  * NotFoundState and ErrorState. DES-5 names both for reuse by the person
- * page (IMDB-8), which is why they live in their own file.
+ * page (IMDB-8) — which is why they live in their own file — and IMDB-8
+ * parameterized the copy's noun (`subject`: 'title' | 'person').
  *
  * Not-found ≠ error (verified live: an unknown/invalid id resolves
- * `title: null` with NO GraphQL error, so the two states can never blur):
+ * `title: null` / `name: null` with NO GraphQL error, so the two states can
+ * never blur):
  *   - NotFoundState: honest copy with the index-freshness caveat when
  *     searchInfo is available (silently absent otherwise — never a guess),
  *     [← Back] (history), and [Search instead], which focuses the omnibox by
@@ -29,7 +31,7 @@ function focusOmnibox() {
   );
 }
 
-export function NotFoundState() {
+export function NotFoundState({ subject = 'title' }) {
   const navigate = useNavigate();
   // The freshness caveat rides the standard searchInfo cache (1 h). If it is
   // unavailable or errored the parenthetical simply drops — DES-2's rule.
@@ -38,7 +40,7 @@ export function NotFoundState() {
 
   return (
     <section className="page-state" data-state="not-found">
-      <h1 className="page-state__headline">This title isn’t in the index.</h1>
+      <h1 className="page-state__headline">{`This ${subject} isn’t in the index.`}</h1>
       <p className="page-state__body">
         It may not exist, or the index may not have it yet
         {rebuiltAt ? ` (Index rebuilt ${formatRebuilt(rebuiltAt)})` : ''}.

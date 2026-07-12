@@ -157,16 +157,16 @@ describe('happy path — the one-sheet', () => {
     );
   });
 
-  it('person chips are non-interactive before IMDB-8: no anchor, not in the tab order', async () => {
+  it('person chips are links to the person detail page (the IMDB-8 upgrade)', async () => {
     stubTransport({ title: godfather() });
     renderPage();
     await findHeadline();
 
+    // The seam IMDB-7 left non-interactive is now the cross-navigation door:
+    // one anchor per chip, Tab-reachable, straight to /person/:nconst.
     const chip = screen.getByText('Al Pacino').closest('.person-entity');
-    expect(chip.tagName).toBe('SPAN');
-    expect(chip.closest('a')).toBeNull();
-    expect(chip).not.toHaveAttribute('tabindex');
-    // The upgrade seam IMDB-8 flips is already in the DOM.
+    expect(chip.tagName).toBe('A');
+    expect(chip).toHaveAttribute('href', '/person/nm199');
     expect(chip).toHaveAttribute('data-nconst', 'nm199');
   });
 
