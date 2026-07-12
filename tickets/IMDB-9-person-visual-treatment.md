@@ -1,12 +1,12 @@
 ---
 id: IMDB-9
 title: Person visual treatment — known-for poster mosaic vs placeholder
-status: in-progress
+status: in-review
 owner: product-owner
 design: designs/DES-6-person-visual-treatment.md
 depends-on: [IMDB-5, IMDB-8, IMDB-14]
 branch: "imdb-9-person-visual-treatment"
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/29"
 ---
 
 ## Description
@@ -106,3 +106,38 @@ IMDB-5 and IMDB-8.
   slot (same 160px box, ladder down to the Monogram floor), the denial-safe
   card-variant pick + poster+badge treatment as `PersonVisual` in
   `src/people/`, autocomplete untouched (Monogram, 0 image requests).
+- **developer** — implemented; `in-review`, PR #29 (draft).
+  **What changed:** `src/people/` gains `PersonVisual.jsx` (DES-6's
+  treatment switch: monogram | mosaic | poster+badge), `KnownForMosaic.jsx`
+  (the header mosaic + full degradation ladder), `PersonPosterBadge.jsx`
+  (card variant, depth-1 ladder) and `knownForPoster.js` (denial-safe pick:
+  first known-for entry, opportunistic client-side max-voted upgrade only
+  when granted `numVotes` values are present); `PersonHeader.jsx` renders
+  `treatment="mosaic"` in the same aria-hidden 160px slot (zero layout
+  change); shared `PosterImage.jsx` gains optional `onLoad`/`onError` so the
+  mosaic can know when tiles settle (the 0–1-resolved whole-slot collapse is
+  unknowable inside a tile — internal 404 → FallbackArt swap unchanged);
+  styles appended at the end of `styles.css`. Colocated suites cover the
+  ladder at 4/3/2/1/0 titles, per-tile fallback, the ≤4/≤1/0 budgets
+  structurally, the denied/granted pick, and grep-prove no treatment reads
+  `numVotes`/`deniedFields`; `PersonPage.test.jsx`'s IMDB-8-era "no img in
+  header" assertion updated to the DES-6 state it now supersedes.
+  **Scope note:** the card variant has NO consumer yet — DES-6's tier names
+  "people-filter chips / any future person grid", but today's chips render
+  from URL nconsts + a session name map with no `knownForTitles` in their
+  query (`UNIVERSAL_SEARCH_QUERY` selects none for people), so applying it
+  would need a new GraphQL selection outside this ticket's scope; nothing in
+  `src/search/`/`src/titles/` changed and autocomplete person rows stay
+  Monogram-only, zero image requests (existing IMDB-5 assertions still pass).
+  **Reduced arrangements caveat for the designer:** DES-6 draws only the
+  4-tile ideal; 3 → two squares + one full-width tile, 2 → two vertical
+  halves is this implementation's reading of "the mosaic stays a mosaic".
+  **Verified:** vitest 581 passed / 0 failed (`--maxWorkers=2`; unthrottled
+  runs flaked on waitFor timeouts across unrelated files on a loaded
+  machine — all pass in isolation); `npm run build` clean; LIVE router
+  (gcloud token, rev 8): nm0000199 → 4 hydrated knownForTitles, `numVotes`
+  redacted per extensions.governance; poster HEADs: all 4 Pacino tconsts
+  200 image/jpeg, tt0000005 404 text/html (the 404 rung is real).
+  **Not verified:** browser eyeballing (deferred per the 2026-07-11
+  directive) and the live granted-`numVotes` upgrade (denied to everyone at
+  rev 8; needs a console grant flip).
