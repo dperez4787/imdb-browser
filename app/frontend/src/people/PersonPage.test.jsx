@@ -5,8 +5,9 @@
  * (client.js#executeWithDenials) is faked, so a wiring break between the
  * page and the data layer cannot hide behind a mocked hook.
  *
- * Covers the ticket's ACs: the no-photo identity header (Monogram, never an
- * image request), the full lifespan denied-vs-missing matrix at page level
+ * Covers the ticket's ACs: the identity header (since IMDB-9/DES-6 the
+ * known-for poster mosaic over the Monogram floor, in DES-5's unchanged
+ * 160px slot), the full lifespan denied-vs-missing matrix at page level
  * (line-level pill under the live both-denied default, inline pill per slot,
  * plain absence when nothing is denied — the confusion rule), the known-for
  * strip in dataset order with NO numVotes dependency, category-grouped
@@ -122,16 +123,28 @@ beforeEach(() => {
 });
 
 describe('happy path — the billing page (live both-denied default)', () => {
-  it('renders the designed identity header: Monogram, name, professions — no person image, ever', async () => {
+  it('renders the DES-6 identity header: known-for mosaic over the Monogram floor, same 160px slot', async () => {
     stubTransport({ name: pacino(), deniedFields: LIFESPAN_DENIED });
     renderPage();
 
     expect(await findHeadline()).toBeVisible();
-    // The PersonVisual slot renders the generated Monogram — initials from
-    // the name, no <img> anywhere in the header (no people-image API exists).
+    // The PersonVisual slot paints the Monogram floor first (initials from
+    // the name — the page never waits on OMDb)...
     const visual = document.querySelector('.person-header__visual');
     expect(within(visual).getByText('AP')).toBeInTheDocument();
-    expect(visual.querySelector('img')).toBeNull();
+    // ...and the IMDB-9 mosaic renders over it: one lazy OMDb tile per
+    // known-for title (4 here — the spec's ≤4-requests-per-page budget is
+    // structural: one img per tile, at most 4 tiles).
+    const tiles = visual.querySelectorAll('img.poster-image');
+    expect(tiles).toHaveLength(4);
+    for (const img of tiles) {
+      expect(img.getAttribute('loading')).toBe('lazy');
+      expect(img.src).toContain('img.omdbapi.com');
+    }
+    // Decorative portrait, not a menu: hidden from AT, nothing interactive
+    // (the Known-for strip below is the clickable version of these titles).
+    expect(visual).toHaveAttribute('aria-hidden', 'true');
+    expect(visual.querySelector('a, button')).toBeNull();
     // Professions: data's words, max 3, ' · ' joined.
     expect(screen.getByText('Actor · Director · Producer')).toBeVisible();
     // Document title per DES-5 Behavior.
