@@ -1,11 +1,11 @@
 ---
 id: IMDB-8
 title: Person detail page with title cross-navigation
-status: ready-for-dev
+status: in-progress
 owner: product-owner
 design: designs/DES-5-person-detail.md
 depends-on: [IMDB-5, IMDB-7, IMDB-14]
-branch: ""
+branch: "imdb-8-person-detail-page"
 pr: ""
 ---
 
@@ -95,3 +95,29 @@ filmography organization — by category? known-for first?), how title entries d
   architecture § Field-level governance; no rendered element on this page depends
   on one. No open design question remains (data-layer ordering rides depends-on
   IMDB-14 as before).
+- **developer** — claimed; branch `imdb-8-person-detail-page`. Live-introspection
+  findings before writing the query (2026-07-12, policy revision 8), correcting
+  DES-5's Data needs for the designer:
+  - Root field is `name(nconst: ID!)`, not `name(id:)`; the entity key is `nconst`,
+    there is no `Name.id`. Unknown nconst resolves `name: null` on HTTP 200 with no
+    GraphQL error — same not-found-vs-error split as `title`.
+  - `primaryProfessions` (plural), not `primaryProfession`.
+  - **Assumption B confirmed**: `Name.credits: [Principal!]!` exists and hydrates
+    in the same query — `Principal { ordering category job characters title }` all
+    present. Caveat found live: `credits` is a curated set **capped at 50 entries**
+    (no tvEpisode/archive-footage noise; Al Pacino returns exactly 50 of 200+ raw
+    principal rows). The root `principalsByName(nconst, limit!, offset!)` serves
+    the full raw principals table (episode-level rows, archive_footage) but is
+    mandatory-paginated and noisy — wrong fit for DES-5's "renders fully, no
+    pagination" filmography, so this page uses `credits` and accepts the 50-cap.
+    Flagged for product-owner/designer as a data-layer fact, not hidden.
+  - Governance observed live for `nm0000199`: **transparent redact mode** — HTTP
+    200, no errors, `birthYear`/`deathYear` absent from data,
+    `extensions.governance.redactedFields: [Name.birthYear, Name.deathYear,
+    Rating.numVotes]`. The page therefore selects governed fields optimistically
+    and relies on the redact-mode `deniedFields` envelope (architecture § Field-level
+    governance: one round trip; a denial-derived fallback document is explicitly
+    retired there). Under the residual reject-mode config fallback, errors.js
+    normalizes the 403 to kind `denied` and the page shows the shared ErrorState
+    with Retry — degraded but never blank; per DES-5 that mode reaching a query is
+    itself the error case.
