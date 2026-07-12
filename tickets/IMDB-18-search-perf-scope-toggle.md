@@ -1,7 +1,7 @@
 ---
 id: IMDB-18
 title: Search perf conformance — prefix-only typing with a Titles/People scope toggle
-status: ready-for-dev
+status: backlog
 owner: user (directive relayed by main session)
 design: designs/DES-2-universal-search.md
 depends-on: [IMDB-5, IMDB-6]
@@ -50,3 +50,4 @@ visual/keyboard/state specs are unchanged.
   "Just add a Person/Title checkbox or something. This is a demo." Supersedes DES-2's
   union-per-keystroke data path per the server-side performance guidance; PO/designer
   round deliberately skipped at the user's direction for speed.
+- **user** (relayed by main session, 2026-07-11) — ON HOLD: paused until the backend federation API changes from the user's perf-fix session settle. The in-flight developer was stopped with no work committed. Re-verify the live search API shapes (and re-measure the prefix/union timings in the brief) before resuming; status backlog until the user gives the word.
