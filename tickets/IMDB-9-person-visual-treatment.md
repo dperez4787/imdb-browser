@@ -1,7 +1,7 @@
 ---
 id: IMDB-9
 title: Person visual treatment — known-for poster mosaic vs placeholder
-status: in-review
+status: done
 owner: product-owner
 design: designs/DES-6-person-visual-treatment.md
 depends-on: [IMDB-5, IMDB-8, IMDB-14]
@@ -141,3 +141,61 @@ IMDB-5 and IMDB-8.
   **Not verified:** browser eyeballing (deferred per the 2026-07-11
   directive) and the live granted-`numVotes` upgrade (denied to everyone at
   rev 8; needs a console grant flip).
+- **tester** — verified on a clean checkout of `imdb-9-person-visual-treatment`
+  (PR #29). `npm ci && npx vitest run --maxWorkers=2` → **585 passed / 0
+  failed / 20 skipped** (skips are the token-gated live suites; throttled per
+  the loaded-machine directive, same as the developer's run); `npm run build`
+  clean. Added `src/people/imdb9-acceptance.tester.test.jsx` — gap tests
+  only: the no-fallback-flash rule asserted at the VISIBILITY level (real
+  `styles.css` injected into jsdom; a failed tile's FallbackArt computes
+  `opacity: 0` until every tile settles, loaded tiles fade in immediately, a
+  doomed 2-tile mosaic never shows a fallback square on its way to the disc),
+  the zero-request floor at the real consumer (PersonHeader + 1 known-for
+  title → Monogram, zero `<img>` in the aria-hidden 160px slot), and the
+  autocomplete 0-budget pinned structurally (`UNIVERSAL_SEARCH_QUERY`'s
+  `... on Name` selects no `knownForTitles`). **Per-criterion:**
+  - **AC-1 (spec records decision, surfaces, budgets) — PASS.** DES-6
+    `approved`: tier table (mosaic ≤4/page header, poster+badge ≤1/card
+    lazy, Monogram 0 in autocomplete), architect feasibility gates recorded.
+  - **AC-2 (search person results + person header render the approved
+    treatment) — PASS.** Header: `PersonVisual treatment="mosaic"` in
+    DES-5's unchanged aria-hidden 160px slot — 4 lazy OMDb tiles, dataset
+    order, nothing focusable/clickable (PersonPage.test + KnownForMosaic
+    suite). Universal-search person rows: DES-6 tier 1 is explicitly
+    Monogram/0-requests — unchanged, IMDB-5 assertions still green.
+    Developer's scope note accepted: the tier-3 card variant ships consumed
+    only via `PersonVisual` because no person-card surface carries
+    `knownForTitles` today (chips render from URL nconsts); the ticket's AC
+    names only search results + header, so this is not a gap in the AC.
+  - **AC-3 (denial-safe card pick, no query fail, opportunistic upgrade) —
+    PASS (agent-verifiable part).** Denied shape → first-entry pick, granted
+    shape → client-side max-voted, both one request, no restricted
+    treatment (PersonVisual/knownForPoster suites); components grep-proved
+    (and independently grepped) free of `numVotes`/`deniedFields` reads —
+    the pick touches `numVotes` only behind a `!= null` presence guard.
+    LIVE (gcloud identity token, rev 8): nm0000199 with `numVotes` selected
+    → HTTP 200, 4 hydrated knownForTitles, `numVotes` silently absent,
+    `extensions.governance.redactedFields: ["Rating.numVotes"]` — the query
+    does not fail. The live granted-flip itself: **not verified** (denied to
+    everyone at rev 8; needs a console grant — demo-day, non-blocking per
+    the 2026-07-11 directive).
+  - **AC-4 (no retrievable posters → graceful fallback, never broken) —
+    PASS.** All-404 → whole slot Monogram; per-tile 404 → FallbackArt
+    revealed only after all tiles settle (my CSS-gate tests); card 404 →
+    plain Monogram, never FallbackArt; PosterImage's internal swap
+    regression-tested. The 404 rung is real: live HEAD tt0000005 → 404,
+    tt0070666/tt0068646 → 200 image/jpeg.
+  - **AC-5 (request budget, lazy) — PASS (structural).** One img per tile,
+    ≤4 tiles, tconst dedupe, `loading="lazy"` everywhere, zero requests at
+    ≤1 usable title id (component + real-consumer level), card ≤1,
+    autocomplete 0. Browser network-tab counting: **not verified** —
+    deferred with the eyeballing.
+  - **AC-6 (keep-placeholder contingency) — N/A**, decision was the mosaic.
+  **Reduced-arrangements ruling (recorded, not failed):** DES-6 draws only
+  the 4-tile ideal; the developer's 3 → two squares + one full-width and
+  2 → two vertical halves keep the square filled (no holes), keep the 2px
+  gaps/6px radius, and collapse to the disc at ≤1 — consistent with the
+  spec's "every step a designed state / the mosaic stays a mosaic"
+  principles. Reasonable interpretation; designer should eyeball it during
+  the live-check period.
+  Everything agent-verifiable passed → `status: done`, PR #29 out of draft.
