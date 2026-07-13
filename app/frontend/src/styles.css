@@ -3058,3 +3058,20 @@ a.person-entity:hover .person-entity__name {
   }
 }
 /* ---- end Title hierarchy browser (IMDB-20) -------------------------------- */
+
+/* ---- Sign-in card link row (demo + making-of) — appended section --------- */
+.signin__links {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.signin__links .signin__story {
+  margin-top: 0;
+}
+.signin__links-sep {
+  color: var(--muted);
+  opacity: 0.6;
+  font-size: 12px;
+}
+/* ---- end Sign-in card link row -------------------------------------------- */

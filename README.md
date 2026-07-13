@@ -5,7 +5,10 @@ A React SPA for rich browsing of IMDb data, backed exclusively by the
 team of Claude Code agents driven from local markdown tickets.
 
 **▶ Live app: [Marquee](https://dfp-imdb-browser.web.app)** — browse IMDb like a
-lobby, not a spreadsheet. (Google sign-in required.)
+lobby, not a spreadsheet. (Google sign-in or one-click guest access — no account needed.)
+
+**🎬 Two-minute demo: [Federating IMDb and AI Agents — Governance Control Plane](https://dfp-imdb-browser.web.app/demo/federating-imdb-and-ai-agents.mp4)** — the
+whole system in motion, no sign-in needed.
 
 **📖 The making-of: [How an agent team built Marquee and its federated IMDb
 backend](https://project-d60a83c1-2c60-4d51-ad0.web.app/blog/imdb-federation/)** — the
