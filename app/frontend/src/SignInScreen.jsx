@@ -92,6 +92,14 @@ export default function SignInScreen() {
         <p className="signin__caption">
           Google sign-in only. No account is created here.
         </p>
+        <a
+          className="signin__story"
+          href="https://project-d60a83c1-2c60-4d51-ad0.web.app/blog/imdb-federation/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Built end-to-end by an agent team — read the making-of&nbsp;↗
+        </a>
       </section>
       <div className="signin__dots" aria-hidden="true" />
     </main>
