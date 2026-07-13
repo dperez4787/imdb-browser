@@ -90,13 +90,17 @@ describe('IMDB-17: no extra tab stop', () => {
     expect(badge.querySelector('button')).toBeNull();
   });
 
-  it('the open menu still has exactly one menuitem (Data roles section is not focusable)', () => {
+  it('the open menu has exactly two menuitems; the Data roles section itself stays non-focusable', () => {
+    // Was one (Sign out only); the governance-console link is the second
+    // (user-directed, 2026-07-12). The invariant this test protects is
+    // unchanged: the Data roles TEXT section contributes no focusable —
+    // the badge/roles copy never becomes a click target.
     renderMenu();
     ingest({ 'X-Imdb-Roles': 'analyst', 'X-Imdb-Policy-Revision': '12' });
 
     fireEvent.click(screen.getByRole('button', { name: /Account: Danny Perez/ }));
 
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1); // Sign out only
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2); // admin link + Sign out
     const section = screen.getByRole('menu').querySelector('.user-menu__roles');
     expect(section.querySelector('button, a, [tabindex]')).toBeNull();
   });

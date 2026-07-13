@@ -126,15 +126,34 @@ describe('UserMenu', () => {
     expect(button).toHaveFocus();
   });
 
-  it('traps Tab inside the open menu', () => {
+  it('traps Tab inside the open menu, cycling its two items', () => {
+    // Two menu items since the governance-console link landed (user-directed,
+    // 2026-07-12): Tab toggles between Sign out and the admin link; focus
+    // never escapes the menu.
     renderMenu();
 
     fireEvent.click(screen.getByRole('button', { name: 'Account: Danny Perez' }));
     const menu = screen.getByRole('menu');
-    fireEvent.keyDown(menu, { key: 'Tab' });
 
+    // Opens with focus on Sign out; first Tab moves to the admin link…
+    fireEvent.keyDown(menu, { key: 'Tab' });
+    expect(
+      screen.getByRole('menuitem', { name: /manage personas & field access/i }),
+    ).toHaveFocus();
+    // …second Tab cycles back to Sign out. Still trapped, menu still open.
+    fireEvent.keyDown(menu, { key: 'Tab' });
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toHaveFocus();
     expect(screen.getByRole('menu')).toBeVisible();
+  });
+
+  it('links to the governance console for personas & field access', () => {
+    renderMenu();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Account: Danny Perez' }));
+    const admin = screen.getByRole('menuitem', { name: /manage personas & field access/i });
+    expect(admin).toHaveAttribute('href', 'https://imdb-policy-service-dkuqnmldta-uc.a.run.app');
+    expect(admin).toHaveAttribute('target', '_blank');
+    expect(admin).toHaveAttribute('rel', 'noreferrer');
   });
 
   it('closes when clicking outside the menu', () => {
@@ -185,8 +204,9 @@ describe('UserMenu — governance role badge (IMDB-17)', () => {
     expect(menu).toHaveTextContent('Data roles');
     expect(menu).toHaveTextContent('analyst, public');
     expect(menu).toHaveTextContent('policy rev 12');
-    // Still exactly one action — the section is static text, not a menu item.
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    // The section is static text, not a menu item: exactly two actions exist
+    // (governance-console link + Sign out), and the roles copy is neither.
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2);
   });
 
   it('menu Data roles section: no-roles shows the exact copy and the redaction explanation', () => {
