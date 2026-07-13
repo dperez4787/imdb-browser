@@ -19,3 +19,14 @@ field-level governance layer it demos.
   in [designs/](designs/)
 - **Agents:** [.claude/agents/](.claude/agents/) — product-owner, ui-ux-designer,
   architect, developer, tester
+
+## Live UIs
+
+Every user-facing surface in this system, live:
+
+| Surface | URL |
+|---|---|
+| **Marquee** — the IMDb browser | https://dfp-imdb-browser.web.app/titles |
+| **IMDb Graph Governance** — field-level policy control plane | https://imdb-policy-service-dkuqnmldta-uc.a.run.app/ |
+| **linear-example** — records app + the engineering blog | https://project-d60a83c1-2c60-4d51-ad0.web.app/ · [blog](https://project-d60a83c1-2c60-4d51-ad0.web.app/blog) |
+
