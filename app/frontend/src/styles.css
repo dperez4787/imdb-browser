@@ -2781,3 +2781,280 @@ a.person-entity:hover .person-entity__name {
   cursor: default;
 }
 /* ---- end Guest sign-in button --------------------------------------------- */
+
+/* ---- Title hierarchy browser (IMDB-20) — appended section ---------------- */
+/* Breadcrumb (episode pages): series › S1 E7 · episode. Same muted/amber    */
+/* language as the header's old episode line, now the page's first line.     */
+.title-breadcrumb {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.title-breadcrumb__series {
+  color: var(--amber);
+  text-decoration: none;
+}
+
+.title-breadcrumb__series:hover,
+.title-breadcrumb__series:focus-visible {
+  text-decoration: underline;
+}
+
+.title-breadcrumb__sep {
+  margin: 0 0.45rem;
+}
+
+/* Episodes section (series pages): DES-4's credit-group idiom — muted       */
+/* uppercase group headers over compact rows.                                */
+.episodes-section {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  align-items: flex-start;
+}
+
+.episodes-section__title {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.episode-group {
+  width: 100%;
+}
+
+.episode-group__header {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.episode-group__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+
+.episode-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.episode-row__marker {
+  flex: none;
+  min-width: 3.2em;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.episode-row__title {
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.episode-row__title:hover,
+.episode-row__title:focus-visible {
+  color: var(--amber);
+}
+
+.episode-row__year {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.episodes-section__more {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.episodes-section__more:hover:not(:disabled),
+.episodes-section__more:focus-visible {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.episodes-section__more:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.episodes-section__error {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Episodes popover ("…" on series-like grid cards). The card's <li> becomes */
+/* the anchor box; the affordance floats over the poster's top-right corner  */
+/* and the panel drops below it. Text rows only — OMDb budget inside is 0.   */
+.title-card {
+  position: relative;
+}
+
+.episodes-popover {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.episodes-popover__button {
+  display: block;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.episodes-popover__button:hover,
+.episodes-popover__button:focus-visible,
+.episodes-popover__button[aria-expanded='true'] {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.episodes-popover__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.6rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.episodes-popover__panel:focus-visible {
+  outline: 1px solid var(--amber);
+}
+
+.episodes-popover__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0.2rem 0;
+}
+
+.episodes-popover__skeleton {
+  height: 12px;
+  width: 100%;
+}
+
+.episodes-popover__empty,
+.episodes-popover__error {
+  margin: 0;
+  padding: 0.2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.episodes-popover__retry {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--amber);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.episodes-popover__retry:hover,
+.episodes-popover__retry:focus-visible {
+  text-decoration: underline;
+}
+
+.episodes-popover__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.episodes-popover__link {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.28rem 0.3rem;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.episodes-popover__link:hover,
+.episodes-popover__link:focus-visible {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--amber);
+}
+
+.episodes-popover__marker {
+  flex: none;
+  min-width: 2.9em;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.episodes-popover__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.episodes-popover__all {
+  display: block;
+  margin-top: 0.4rem;
+  padding: 0.3rem;
+  border-top: 1px solid var(--hairline);
+  color: var(--amber);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.episodes-popover__all:hover,
+.episodes-popover__all:focus-visible {
+  text-decoration: underline;
+}
+
+/* Narrow viewports: episode rows stack single-column (minmax(0,…) so long
+   titles shrink instead of forcing a page scroll), and the popover panel
+   never outgrows the screen from a left-column card. */
+@media (max-width: 720px) {
+  .episode-group__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .episodes-popover__panel {
+    width: min(240px, 78vw);
+  }
+}
+/* ---- end Title hierarchy browser (IMDB-20) -------------------------------- */

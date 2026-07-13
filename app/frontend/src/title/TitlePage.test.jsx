@@ -17,6 +17,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeWithDenials } from '../graphql/client.js';
+import { TITLE_EPISODES_QUERY } from '../graphql/episodeQueries.js';
 import { SEARCH_INFO_QUERY } from '../graphql/queries.js';
 import { createQueryClient } from '../graphql/queryClient.js';
 import { TITLE_DETAIL_QUERY } from '../graphql/titleQueries.js';
@@ -59,15 +60,25 @@ const godfather = ({ rating = { averageRating: 9.2, numVotes: 2132880 }, episode
 
 const REBUILT = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
 
-/** Fake the transport per document: the page query + not-found's searchInfo. */
-function stubTransport({ title, deniedFields = [], titleError = null } = {}) {
-  executeWithDenials.mockImplementation(async (document) => {
+/**
+ * Fake the transport per document: the page query, not-found's searchInfo,
+ * and (IMDB-20) the EpisodesSection's own TITLE_EPISODES_QUERY — empty by
+ * default, so every pre-existing scenario exercises the zero-DOM rule.
+ */
+function stubTransport({ title, deniedFields = [], titleError = null, episodes = [] } = {}) {
+  executeWithDenials.mockImplementation(async (document, variables) => {
     if (document === TITLE_DETAIL_QUERY) {
       if (titleError) throw titleError;
       return env({ title }, deniedFields);
     }
     if (document === SEARCH_INFO_QUERY) {
       return env({ searchInfo: { rebuiltAt: REBUILT, titleCount: 1, nameCount: 1 } });
+    }
+    if (document === TITLE_EPISODES_QUERY) {
+      const { limit, offset } = variables;
+      return env({
+        title: { tconst: variables.tconst, episodes: episodes.slice(offset, offset + limit) },
+      });
     }
     throw new Error('unexpected document');
   });
@@ -170,7 +181,7 @@ describe('happy path — the one-sheet', () => {
     expect(chip).toHaveAttribute('data-nconst', 'nm199');
   });
 
-  it('episode context renders for tvEpisode titles, linking the series to its own page', async () => {
+  it('IMDB-20 breadcrumb: an episode page opens with `Series › S1 E7 · Episode`, series linked', async () => {
     stubTransport({
       title: {
         ...godfather(),
@@ -185,11 +196,24 @@ describe('happy path — the one-sheet', () => {
     renderPage();
     await screen.findByRole('heading', { level: 1, name: 'Pilot' });
 
-    expect(screen.getByText('S1 · E7')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Breaking Bad' })).toHaveAttribute(
+    const crumb = screen.getByRole('navigation', { name: 'Title hierarchy' });
+    expect(within(crumb).getByRole('link', { name: 'Breaking Bad' })).toHaveAttribute(
       'href',
       '/title/tt0903747',
     );
+    expect(within(crumb).getByText('S1 E7 · Pilot')).toBeVisible();
+    // The placement is stated ONCE: the old "S1 · E7 of <series>" header
+    // line is gone — exactly one series link on the page, inside the crumb.
+    expect(screen.getAllByRole('link', { name: 'Breaking Bad' })).toHaveLength(1);
+    expect(screen.queryByText('S1 · E7')).toBeNull();
+  });
+
+  it('IMDB-20 breadcrumb: non-episode titles show no breadcrumb at all', async () => {
+    stubTransport({ title: godfather() });
+    renderPage();
+    await findHeadline();
+
+    expect(screen.queryByRole('navigation', { name: 'Title hierarchy' })).toBeNull();
   });
 
   it('partial data drops segments silently — no rating block, no “N/A” anywhere', async () => {
@@ -306,5 +330,57 @@ describe('states', () => {
     stubTransport({ title: godfather() });
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await findHeadline()).toBeVisible();
+  });
+});
+
+describe('IMDB-20 episodes section on the page', () => {
+  it('a movie (episodes resolve empty) grows NO episodes DOM at all', async () => {
+    stubTransport({ title: godfather(), episodes: [] });
+    renderPage();
+    await findHeadline();
+
+    // The section's query ran (its own document, not the detail query)…
+    await waitFor(() =>
+      expect(
+        executeWithDenials.mock.calls.some(([document]) => document === TITLE_EPISODES_QUERY),
+      ).toBe(true),
+    );
+    // …and resolved empty → zero DOM: no frame, no header, no placeholder.
+    expect(document.querySelector('.episodes-section')).toBeNull();
+    expect(screen.queryByText('Episodes')).toBeNull();
+  });
+
+  it('a series renders the season-grouped section below the credits, rows linking to episodes', async () => {
+    stubTransport({
+      title: { ...godfather(), primaryTitle: 'Breaking Bad', titleType: 'tvSeries' },
+      episodes: [
+        {
+          tconst: 'tt0959621',
+          primaryTitle: 'Pilot',
+          startYear: 2008,
+          episode: { seasonNumber: 1, episodeNumber: 1 },
+        },
+        {
+          tconst: 'tt1054724',
+          primaryTitle: "Cat's in the Bag...",
+          startYear: 2008,
+          episode: { seasonNumber: 1, episodeNumber: 2 },
+        },
+      ],
+    });
+    renderPage();
+    await screen.findByRole('heading', { level: 1, name: 'Breaking Bad' });
+
+    const section = await screen.findByRole('region', { name: 'Episodes' });
+    expect(within(section).getByText('Season 1')).toBeVisible();
+    expect(within(section).getByRole('link', { name: 'Pilot' })).toHaveAttribute(
+      'href',
+      '/title/tt0959621',
+    );
+    expect(within(section).getByText('S1E1')).toBeVisible();
+    // Below the credits: the section follows the credit groups in the DOM.
+    const article = document.querySelector('.title-page');
+    const credits = article.querySelector('.title-credits');
+    expect(credits.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

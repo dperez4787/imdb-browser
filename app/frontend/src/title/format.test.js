@@ -8,11 +8,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatCategory,
+  formatEpisodeMarker,
   formatRuntime,
   formatTitleType,
   formatVotes,
   formatYears,
   groupCredits,
+  groupEpisodesBySeason,
 } from './format.js';
 
 describe('formatRuntime', () => {
@@ -142,6 +144,59 @@ describe('groupCredits', () => {
         category: 'actor',
         entries: [entry(3, 'actor', 'Kept')],
       },
+    ]);
+  });
+});
+
+describe('formatEpisodeMarker (IMDB-20)', () => {
+  it('compact S#E# for hierarchy rows', () => {
+    expect(formatEpisodeMarker({ seasonNumber: 1, episodeNumber: 7 })).toBe('S1E7');
+  });
+  it('degrades to the parts it has, null when neither exists', () => {
+    expect(formatEpisodeMarker({ seasonNumber: 2, episodeNumber: null })).toBe('S2');
+    expect(formatEpisodeMarker({ seasonNumber: null, episodeNumber: 5 })).toBe('E5');
+    expect(formatEpisodeMarker({ seasonNumber: null, episodeNumber: null })).toBeNull();
+    expect(formatEpisodeMarker(null)).toBeNull();
+  });
+});
+
+const ep = (n, seasonNumber, episodeNumber, primaryTitle = `Ep ${n}`) => ({
+  tconst: `tt${n}`,
+  primaryTitle,
+  startYear: 2008,
+  episode: { seasonNumber, episodeNumber },
+});
+
+describe('groupEpisodesBySeason (IMDB-20)', () => {
+  it('one group per season in first-appearance (API) order, episodes kept in order', () => {
+    const groups = groupEpisodesBySeason([ep(1, 1, 1), ep(2, 1, 2), ep(3, 2, 1)]);
+    expect(groups.map((g) => g.label)).toEqual(['Season 1', 'Season 2']);
+    expect(groups[0].episodes.map((e) => e.tconst)).toEqual(['tt1', 'tt2']);
+    expect(groups[1].episodes.map((e) => e.tconst)).toEqual(['tt3']);
+  });
+
+  it('seasonNumber null groups under "Specials"', () => {
+    const groups = groupEpisodesBySeason([ep(1, 1, 1), ep(2, null, null), ep(3, null, 1)]);
+    expect(groups.map((g) => g.label)).toEqual(['Season 1', 'Specials']);
+    expect(groups[1].episodes.map((e) => e.tconst)).toEqual(['tt2', 'tt3']);
+  });
+
+  it('a missing episode block counts as Specials too (no placement data)', () => {
+    const groups = groupEpisodesBySeason([{ tconst: 'tt9', primaryTitle: 'Floating', episode: null }]);
+    expect(groups.map((g) => g.label)).toEqual(['Specials']);
+  });
+
+  it('drops unlinkable entries and never throws on missing input', () => {
+    expect(groupEpisodesBySeason(null)).toEqual([]);
+    expect(groupEpisodesBySeason(undefined)).toEqual([]);
+    expect(
+      groupEpisodesBySeason([
+        { tconst: null, primaryTitle: 'No id', episode: { seasonNumber: 1 } },
+        { tconst: 'tt1', primaryTitle: null, episode: { seasonNumber: 1 } },
+        ep(2, 1, 1, 'Kept'),
+      ]),
+    ).toEqual([
+      { key: 'season-1', label: 'Season 1', episodes: [ep(2, 1, 1, 'Kept')] },
     ]);
   });
 });
