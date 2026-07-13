@@ -2715,3 +2715,23 @@ a.person-entity:hover .person-entity__name {
 }
 
 /* ---- end Person visual treatment (IMDB-9 / DES-6) ------------------------ */
+
+/* ---- Making-of story link (sign-in card) — appended section ------------- */
+/* External link to the creation blog post. Muted like the caption; the      */
+/* underline appears on hover/focus so the card keeps exactly one loud       */
+/* action (the Google button) — Marquee's one-front-door rule.               */
+.signin__story {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dotted color-mix(in srgb, var(--muted) 55%, transparent);
+  transition: color 120ms ease;
+}
+.signin__story:hover,
+.signin__story:focus-visible {
+  color: var(--text);
+  border-bottom-style: solid;
+}
+/* ---- end Making-of story link ------------------------------------------- */

@@ -126,9 +126,18 @@ describe('AC1 — signed out, the sign-in screen is the only reachable surface',
       screen.getByText(/google sign-in only\. no account is created here\./i),
     ).toBeVisible();
 
-    // No shell chrome, no routed view, no navigation of any kind.
+    // No shell chrome, no routed view, no APP navigation of any kind. The one
+    // sanctioned anchor is the external making-of story link (user-directed,
+    // 2026-07-12): it must be the ONLY link, external, and open in a new tab —
+    // in-app hrefs (starting with "/") remain forbidden signed-out.
     expect(screen.queryByRole('banner')).toBeNull();
-    expect(screen.queryByRole('link')).toBeNull();
+    const links = screen.queryAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute(
+      'href',
+      'https://project-d60a83c1-2c60-4d51-ad0.web.app/blog/imdb-federation/',
+    );
+    expect(links[0]).toHaveAttribute('target', '_blank');
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.queryByText(/now showing/i)).toBeNull();
     expect(document.querySelector('.app-shell')).toBeNull();
