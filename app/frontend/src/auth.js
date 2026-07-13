@@ -4,14 +4,18 @@
  * else — AuthContext, AuthGate, and later the GraphQL client (IMDB-4) — depends
  * on these four small functions, never on the Firebase SDK directly.
  *
- * Google is the ONLY sign-in path: no email/password, no anonymous. Those
- * providers are absent from the code by design (project brief, Authentication).
+ * Two sign-in paths: Google (the full identity, eligible for governance
+ * personas) and anonymous guest (user-directed, 2026-07-12 — one-click entry
+ * for reviewers; guests have no email, so they can never match a persona and
+ * always see the redacted/no-data-role state). No email/password — absent by
+ * design (project brief, Authentication).
  */
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
   getAuth,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
@@ -41,9 +45,19 @@ export function subscribeToAuth(listener) {
   return onAuthStateChanged(auth(), listener);
 }
 
-/** Google sign-in via popup — the only sign-in the app offers. */
+/** Google sign-in via popup — the full-identity path. */
 export async function signInWithGoogle() {
   return signInWithPopup(auth(), new GoogleAuthProvider());
+}
+
+/**
+ * Anonymous guest sign-in — no account, no popup. The token it yields is a
+ * real Firebase ID token (same issuer/audience), so the router and the chat
+ * backend accept it unchanged; governance sees no email → no persona → no
+ * roles, which is exactly the reviewer-facing demo state.
+ */
+export async function signInAsGuest() {
+  return signInAnonymously(auth());
 }
 
 export async function signOutUser() {

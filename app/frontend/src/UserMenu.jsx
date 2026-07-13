@@ -27,7 +27,9 @@ export default function UserMenu() {
   const signOutRef = useRef(null);
   const adminLinkRef = useRef(null);
 
-  const label = user.displayName ?? user.email ?? 'Signed in';
+  // Anonymous guests have no displayName/email — label them honestly (the
+  // guest path is a first-class identity since 2026-07-12, not a fallback).
+  const label = user.isAnonymous ? 'Guest' : (user.displayName ?? user.email ?? 'Signed in');
 
   // The trigger's accessible name extends with the badge state (DES-1 addendum):
   // "<name> — data roles: …" / "<name> — no data role" / just the name while
@@ -120,10 +122,19 @@ export default function UserMenu() {
         // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
         <div className="user-menu__menu" role="menu" aria-label="Account" onKeyDown={onMenuKeyDown}>
           <div className="user-menu__identity">
-            {user.displayName && (
-              <span className="user-menu__name">{user.displayName}</span>
+            {user.isAnonymous ? (
+              <>
+                <span className="user-menu__name">Guest</span>
+                <span className="user-menu__email">browsing without an account</span>
+              </>
+            ) : (
+              <>
+                {user.displayName && (
+                  <span className="user-menu__name">{user.displayName}</span>
+                )}
+                {user.email && <span className="user-menu__email">{user.email}</span>}
+              </>
             )}
-            {user.email && <span className="user-menu__email">{user.email}</span>}
           </div>
           {/* Data roles — static, non-focusable text (the badge's explainer and
               the sole role surface below 720px). Not a menu item: skipped by

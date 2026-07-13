@@ -45,6 +45,7 @@ const renderApp = () =>
 vi.mock('./auth.js', () => ({
   subscribeToAuth: vi.fn(),
   signInWithGoogle: vi.fn(),
+  signInAsGuest: vi.fn(),
   signOutUser: vi.fn(),
   getIdToken: vi.fn(),
 }));
@@ -123,7 +124,7 @@ describe('AC1 — signed out, the sign-in screen is the only reachable surface',
 
     expect(signInButton()).toBeVisible();
     expect(
-      screen.getByText(/google sign-in only\. no account is created here\./i),
+      screen.getByText(/google sign-in or one-click guest access\. no account is created here\./i),
     ).toBeVisible();
 
     // No shell chrome, no routed view, no APP navigation of any kind. The one

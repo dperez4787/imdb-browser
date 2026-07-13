@@ -13,6 +13,7 @@ import { signInWithGoogle, subscribeToAuth } from './auth.js';
 vi.mock('./auth.js', () => ({
   subscribeToAuth: vi.fn(),
   signInWithGoogle: vi.fn(),
+  signInAsGuest: vi.fn(),
   signOutUser: vi.fn(),
   getIdToken: vi.fn(),
 }));
@@ -59,7 +60,7 @@ describe('AuthGate states', () => {
     act(() => authListener(null));
 
     expect(screen.getByRole('button', { name: /sign in with google/i })).toBeVisible();
-    expect(screen.getByText(/google sign-in only\. no account is created here\./i)).toBeVisible();
+    expect(screen.getByText(/google sign-in or one-click guest access\. no account is created here\./i)).toBeVisible();
     expect(screen.queryByTestId('app-shell')).toBeNull();
     expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
   });

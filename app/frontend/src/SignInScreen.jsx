@@ -37,7 +37,7 @@ function GoogleGMark() {
 // exactly one action (Google sign-in), an inline in-flight state (spinner
 // replaces the G mark, button disabled), and an inline error under the button.
 export default function SignInScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInGuest } = useAuth();
   const [inFlight, setInFlight] = useState(false);
   const [error, setError] = useState(null);
   const buttonRef = useRef(null);
@@ -54,6 +54,20 @@ export default function SignInScreen() {
       await signIn();
       // Success unmounts this screen via the auth subscription; no local
       // state change is needed (and by then this component may be gone).
+    } catch (err) {
+      setError(`Couldn't sign in — ${shortReason(err)}. Try again.`);
+      setInFlight(false);
+    }
+  }
+
+  // Guest entry (user-directed, 2026-07-12): anonymous Firebase sign-in — no
+  // popup, no account. Shares the in-flight lock with the Google path so the
+  // two buttons can't race.
+  async function handleGuest() {
+    setError(null);
+    setInFlight(true);
+    try {
+      await signInGuest();
     } catch (err) {
       setError(`Couldn't sign in — ${shortReason(err)}. Try again.`);
       setInFlight(false);
@@ -84,13 +98,21 @@ export default function SignInScreen() {
           )}
           Sign in with Google
         </button>
+        <button
+          className="guest-btn"
+          type="button"
+          onClick={handleGuest}
+          disabled={inFlight}
+        >
+          Continue as guest — no account needed
+        </button>
         {error && (
           <p className="signin__error" role="alert">
             {error}
           </p>
         )}
         <p className="signin__caption">
-          Google sign-in only. No account is created here.
+          Google sign-in or one-click guest access. No account is created here.
         </p>
         <a
           className="signin__story"

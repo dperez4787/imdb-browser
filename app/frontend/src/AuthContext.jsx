@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { signInWithGoogle, signOutUser, subscribeToAuth } from './auth.js';
+import { signInAsGuest, signInWithGoogle, signOutUser, subscribeToAuth } from './auth.js';
 
 // Holds the current Firebase user in React state and exposes sign-in/sign-out.
 // The app's single source of auth truth: signing out (from anywhere) fires the
@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
       user,
       initializing,
       signIn: signInWithGoogle,
+      signInGuest: signInAsGuest,
       signOut: signOutUser,
     }),
     [user, initializing],
