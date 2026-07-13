@@ -301,13 +301,19 @@ describe('DES-1 — UserMenu keyboard contract', () => {
     expect(avatar).toHaveFocus();
   });
 
-  it('traps Tab while the menu is open', () => {
+  it('traps Tab while the menu is open (two-item cycle since the governance link)', () => {
     renderApp();
     act(() => emitAuth(googleUser));
 
     fireEvent.click(screen.getByRole('button', { name: 'Account: Danny Perez' }));
-    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Tab' });
-
+    const menu = screen.getByRole('menu');
+    // Tab cycles admin link <-> Sign out; two Tabs return to Sign out. Focus
+    // never leaves the menu (the trap this AC pins), menu stays open.
+    fireEvent.keyDown(menu, { key: 'Tab' });
+    expect(
+      screen.getByRole('menuitem', { name: /manage personas & field access/i }),
+    ).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'Tab' });
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toHaveFocus();
     expect(screen.getByRole('menu')).toBeVisible();
   });

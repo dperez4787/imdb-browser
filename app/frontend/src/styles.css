@@ -2735,3 +2735,21 @@ a.person-entity:hover .person-entity__name {
   border-bottom-style: solid;
 }
 /* ---- end Making-of story link ------------------------------------------- */
+
+/* ---- Governance console link (UserMenu) — appended section --------------- */
+/* A quiet menu row between Data roles and Sign out: where the roles above    */
+/* are decided. Same muted treatment as the sign-in story link.               */
+.user-menu__admin {
+  display: block;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-top: 1px solid color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.user-menu__admin:hover,
+.user-menu__admin:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+/* ---- end Governance console link ----------------------------------------- */

@@ -25,6 +25,7 @@ export default function UserMenu() {
   const rootRef = useRef(null);
   const buttonRef = useRef(null);
   const signOutRef = useRef(null);
+  const adminLinkRef = useRef(null);
 
   const label = user.displayName ?? user.email ?? 'Signed in';
 
@@ -70,9 +71,15 @@ export default function UserMenu() {
       event.stopPropagation();
       closeAndRefocus();
     } else if (event.key === 'Tab') {
-      // Focus trap: Sign out is the menu's only focusable item.
+      // Focus trap: two menu items — the governance-console link and Sign out.
+      // Tab (either direction) toggles between them; with only two items the
+      // forward and reverse cycles are the same swap.
       event.preventDefault();
-      signOutRef.current?.focus();
+      if (document.activeElement === signOutRef.current) {
+        adminLinkRef.current?.focus();
+      } else {
+        signOutRef.current?.focus();
+      }
     }
   }
 
@@ -140,6 +147,19 @@ export default function UserMenu() {
               <span className="user-menu__roles-rev">policy rev {revision}</span>
             )}
           </div>
+          {/* Where roles are decided: the IMDb Graph Governance console
+              (personas + field access). External admin surface — opens in a
+              new tab; user-directed addition (2026-07-12). */}
+          <a
+            ref={adminLinkRef}
+            className="user-menu__admin"
+            role="menuitem"
+            href="https://imdb-policy-service-dkuqnmldta-uc.a.run.app"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Manage personas &amp; field access&nbsp;↗
+          </a>
           <button
             ref={signOutRef}
             className="user-menu__signout"
