@@ -18,6 +18,7 @@ import { createQueryClient } from './graphql/queryClient.js';
 vi.mock('./auth.js', () => ({
   subscribeToAuth: vi.fn(),
   signInWithGoogle: vi.fn(),
+  signInAsGuest: vi.fn(),
   signOutUser: vi.fn(),
   getIdToken: vi.fn(),
 }));

@@ -119,10 +119,14 @@ https://img.omdbapi.com/?i=tt3896198&apikey=db1f8efc
 
 ## Authentication
 
-The SPA enforces login exactly like linear-example: **Firebase Auth, Google sign-in
-only** (no email/password, no anonymous), one `auth.js` boundary module, one `AuthGate`
-component wrapping the entire app. Nothing user-visible renders signed-out except the
-sign-in screen.
+The SPA enforces login through one `auth.js` boundary module and one `AuthGate`
+component wrapping the entire app; nothing user-visible renders signed-out except the
+sign-in screen. Two providers (no email/password): **Google** (full identity, eligible
+for governance personas) and **anonymous guest** (added 2026-07-12 at the user's
+direction — one-click entry for reviewers; anonymous tokens share the same issuer and
+audience so the router and chat accept them unchanged, and a guest's lack of email
+means no persona can match: guests always see the redacted/no-data-role state, which
+is the passive governance demo).
 
 **Open question for the architect:** how the browser authenticates *to the cosmo
 router*. The router's live checks include anonymous 401/403 responses, so it is not

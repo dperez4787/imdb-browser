@@ -14,6 +14,7 @@ import { ingestResponse, resetGovernanceRoles } from './graphql/rolesStore.js';
 vi.mock('./auth.js', () => ({
   subscribeToAuth: vi.fn(),
   signInWithGoogle: vi.fn(),
+  signInAsGuest: vi.fn(),
   signOutUser: vi.fn(),
   getIdToken: vi.fn(),
 }));
@@ -218,6 +219,22 @@ describe('UserMenu — governance role badge (IMDB-17)', () => {
     expect(menu).toHaveTextContent('No data role');
     expect(menu).toHaveTextContent(/Governed fields are redacted for you/);
     expect(menu).toHaveTextContent('policy rev 12');
+  });
+
+  it('labels an anonymous guest honestly: Guest trigger, no email, sign-out works', async () => {
+    renderMenu({ uid: 'anon-guest-1', displayName: null, email: null, photoURL: null, isAnonymous: true });
+
+    const button = screen.getByRole('button', { name: 'Account: Guest' });
+    expect(button.querySelector('.monogram')).toHaveTextContent('G');
+
+    fireEvent.click(button);
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveTextContent('Guest');
+    expect(menu).toHaveTextContent('browsing without an account');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    });
+    expect(signOutUser).toHaveBeenCalledTimes(1);
   });
 
   it('menu Data roles section: shows an em dash while Unknown (never reflows on first response)', () => {

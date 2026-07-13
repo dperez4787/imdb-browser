@@ -11,7 +11,7 @@ exclusively** — the SPA never talks to MongoDB or to individual subgraphs.
 | Frontend  | React SPA (Vite) — browse/search UI over the federated IMDb graph |
 | Data API  | Cosmo router (GraphQL federation) — the SPA's only data source |
 | Chat      | Small Node backend on Cloud Run holding `ANTHROPIC_API_KEY`; talks to the federated GraphQL layer via a GraphQL MCP server |
-| Auth      | Firebase Auth, **Google sign-in only**, enforced by an AuthGate — no anonymous access to any view |
+| Auth      | Firebase Auth behind an AuthGate — **Google sign-in or anonymous guest** (guest added 2026-07-12 for frictionless review; guests have no email so governance personas can never match them) |
 | Deploy    | Firebase Hosting (SPA) + Cloud Run (chat backend), GitHub Actions with OIDC/WIF — same pattern as `dperez4787/linear-example` |
 | Images    | OMDb image API (`img.omdbapi.com`) for title posters in search results |
 
