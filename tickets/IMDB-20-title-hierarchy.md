@@ -1,12 +1,12 @@
 ---
 id: IMDB-20
 title: Title hierarchy browser + episodes popover
-status: in-progress
+status: in-review
 owner: user (directive relayed by main session)
 design: designs/DES-4-title-detail.md   # visual-language reference; additions match its idiom
 depends-on: [IMDB-6, IMDB-7]
 branch: imdb-20-title-hierarchy
-pr: ""
+pr: "https://github.com/dperez4787/imdb-browser/pull/33"
 ---
 
 ## Description
@@ -72,3 +72,40 @@ path already ships in TITLE_DETAIL_QUERY.
   reference for the title-page additions, and the schema facts above were
   live-introspected by the main session the same day.
 - **developer** — claimed: status → in-progress, branch `imdb-20-title-hierarchy`.
+- **developer** — implemented; status → in-review, PR
+  https://github.com/dperez4787/imdb-browser/pull/33 (draft).
+  - New: `graphql/episodeQueries.js` + `graphql/episodeHooks.js`
+    (`useTitleEpisodes` — offset-paged `useInfiniteQuery`; `Title.episodes`
+    has no total, so a short page is the end signal and `hasNextPage` IS the
+    Load-more condition), `graphql/episodeQueries.live.integration.test.js`
+    (LIVE_ROUTER_TOKEN-gated, same pattern as live-router.integration.test.js),
+    `title/TitleBreadcrumb.jsx`, `title/EpisodesSection.jsx`,
+    `titles/EpisodesPopover.jsx` (+ colocated tests). Changed:
+    `title/TitlePage.jsx` (breadcrumb above the header, section below the
+    credits), `title/TitleHeader.jsx`, `title/format.js`
+    (`formatEpisodeMarker`, `groupEpisodesBySeason`), `titles/TitleCard.jsx`
+    (gate + sibling popover), `styles.css` (appended section at the very
+    end). No pre-existing `src/graphql/` file was modified.
+  - **Breadcrumb-vs-episode-line choice: REPLACED.** The old
+    "S1 · E7 of <series>" line under the h1 is gone; the breadcrumb at the
+    top carries the same placement plus the episode's own title, so the
+    information appears exactly once (the ticket offered keep-or-replace).
+  - The `tvSeries`/`tvMiniSeries` ellipsis gate is a commented UI heuristic,
+    not a data vocabulary — the repo's no-hard-coding rule guards facet
+    vocabularies; a type outside the pair still shows its children on its
+    detail page, so the heuristic can never hide data.
+  - Judgment call beyond the spec text: when the episodes query FAILS the
+    section shows one quiet line + Retry rather than nothing (zero DOM is
+    the spec'd state for a list that RESOLVES empty; hiding a failure would
+    silently amputate a series' episode list). On the rare movie-page
+    failure this line is honest but slightly odd — flagging for the tester.
+  - Verified: full suite 617 passed / 23 skipped (`npx vitest run
+    --maxWorkers=2`), `npm run build` OK (pre-existing chunk-size warning),
+    and LIVE router through the real client module + this document (gcloud
+    identity token): tt0903747 → 12 episodes, S1E1 "Pilot" first,
+    season/episode-ordered, deterministic offset paging; tt0068646 → `[]`.
+  - NOT verified: real-browser eyeballing (popover positioning, breadcrumb,
+    narrow reflow) — deferred per the 2026-07-11 directive; and the live
+    check used a Google OIDC token, not a Firebase ID token (the standing
+    IMDB-4 seam). `Title.imgUrl` exists on the graph now; deliberately not
+    adopted here (separate concern per the directive).
