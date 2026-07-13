@@ -1,7 +1,7 @@
 ---
 id: IMDB-20
 title: Title hierarchy browser + episodes popover
-status: in-review
+status: done
 owner: user (directive relayed by main session)
 design: designs/DES-4-title-detail.md   # visual-language reference; additions match its idiom
 depends-on: [IMDB-6, IMDB-7]
@@ -109,3 +109,70 @@ path already ships in TITLE_DETAIL_QUERY.
     check used a Google OIDC token, not a Firebase ID token (the standing
     IMDB-4 seam). `Title.imgUrl` exists on the graph now; deliberately not
     adopted here (separate concern per the directive).
+- **tester** (2026-07-12) — verified on PR #33 (`imdb-20-title-hierarchy`),
+  clean checkout (`npm ci` in app/frontend and app/chat). Per-criterion:
+  - **Breadcrumb** — PASS. Episode page renders `Breaking Bad › S1 E7 · Pilot`
+    inside `nav[aria-label="Title hierarchy"]`, series segment a real link to
+    `/title/tt0903747`; non-episode titles render no breadcrumb node at all.
+    Single placement confirmed: the old `S1 · E7 of` header line is gone from
+    TitleHeader.jsx and the page carries exactly one series link
+    (TitlePage.test.jsx asserts both). REPLACED, per the developer's
+    keep-or-replace call — accepted, it satisfies the not-twice criterion.
+  - **Episodes section** — PASS. Season grouping in API first-appearance
+    order, `seasonNumber: null` → "Specials", rows `S#E#` + linked primary
+    title + muted year (EpisodesSection.test.jsx, format.test.js, and the
+    TitlePage-level in-situ test placing the section after `.title-credits`).
+  - **Own query + paging** — PASS. `TITLE_EPISODES_QUERY` is its own document
+    (limit 60, offset paging), not part of TITLE_DETAIL_QUERY. Short-page
+    heuristic verified at the boundary by the tester gap suite
+    (imdb20-acceptance.tester.test.jsx): exactly-60 list → Load more →
+    empty page retires the button, list intact, no error; 62-list → click
+    appends (never replaces — page-1 rows survive, count 62); short first
+    page → no button. Empty resolve → zero DOM (`container.innerHTML === ''`).
+  - **Empty vs error distinct** — PASS (developer's flagged judgment call
+    verified as two distinct states): resolve-empty → zero DOM; fetch failure
+    → visible "Couldn’t load episodes." + Retry, which recovers; a failed
+    Load-more keeps the loaded 60 rows next to the Retry line and Retry
+    resumes paging (tester gap suite). Judgment call accepted — the spec'd
+    zero-DOM state is for a list that RESOLVES empty, and hiding failures
+    would silently amputate episode lists.
+  - **Popover** — PASS. Ellipsis only on tvSeries/tvMiniSeries (movie and
+    tvEpisode cards get none); zero fetch before first open, exactly one
+    fetch (limit 12, offset 0) after, close/reopen serves from cache with no
+    refetch; loading skeleton / "No episodes found" / error + Retry all
+    exercised; rows and "All episodes →" footer link correctly; a popover row
+    click is a real navigation to `/title/tt2` (tester gap suite).
+  - **Card click-through intact / "…" never navigates** — PASS. Opening the
+    popover leaves the router at `/titles` (location probe), card link intact.
+  - **Accessibility** — PASS. Real button with `aria-label "Episodes of
+    <title>"`, `aria-haspopup="dialog"`, `aria-expanded` toggling; focus
+    moves to the dialog on open; Esc closes and returns focus to the button;
+    outside mousedown closes.
+  - **Cache lineage isolation** — PASS (tester gap suite): section
+    `{tconst, limit:60}` and popover `{tconst, limit:12}` for the SAME tconst
+    in ONE QueryClient produce two distinct cache entries; the section keeps
+    its 60 rows while the popover shows its 12 — no clobbering.
+  - **Zero OMDb in popover** — PASS. No `<img>` inside the dialog and the
+    document-wide `<img>` count is unchanged across open (only the card
+    poster exists).
+  - **Conventions** — PASS. All data through `src/graphql/` (new
+    episodeQueries.js/episodeHooks.js; `git diff --stat` shows no
+    pre-existing graphql file modified); no `fetch()`/inline gql in
+    components; styles.css appended at the very end; tests colocated.
+  - **Suite + build (clean checkout)** — PASS. `npm ci` then
+    `npx vitest run --maxWorkers=2`: 622 passed / 23 skipped (live-gated),
+    0 failed; app/chat `npm test`: 58/58; `npm run build` OK (pre-existing
+    chunk-size warning only).
+  - **LIVE router** — PASS. `LIVE_ROUTER_TOKEN="$(gcloud auth
+    print-identity-token)" npx vitest run
+    src/graphql/episodeQueries.live.integration.test.js`: 3/3 — tt0903747
+    first page of 12 with S1E1 "Pilot" first and season/episode ordering,
+    offset paging deterministic (limit 5 offset 0 vs offset 5, zero overlap),
+    tt0068646 → `[]`.
+  - **NOT verified** (human-only, non-blocking per the 2026-07-11 directive):
+    real-browser eyeballing — popover anchoring/positioning, breadcrumb
+    visual, narrow-viewport reflow; and the live check used a Google OIDC
+    identity token rather than a Firebase ID token (standing IMDB-4 seam).
+  - Verdict: all agent-verifiable criteria PASS. Status → done; PR #33 taken
+    out of draft (`gh pr ready`). Human eyeballing lands in the testing
+    period per the standing directive.
