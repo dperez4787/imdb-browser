@@ -63,6 +63,47 @@ export function formatCategory(category) {
 }
 
 /**
+ * Compact episode marker for hierarchy rows (IMDB-20): 'S1E7' — partial
+ * placements degrade to 'S1' / 'E7', and null when neither number exists,
+ * per the partial-data rule (callers drop the segment silently).
+ */
+export function formatEpisodeMarker(episode) {
+  if (!episode) return null;
+  const parts = [
+    episode.seasonNumber != null ? `S${episode.seasonNumber}` : null,
+    episode.episodeNumber != null ? `E${episode.episodeNumber}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join('') : null;
+}
+
+/**
+ * Group a series' episode list into season groups for the Episodes section
+ * (IMDB-20): one group per distinct seasonNumber in FIRST-APPEARANCE order
+ * (the API returns episodes ordered by season/episode, so this preserves
+ * its ordering rather than imposing one), with `seasonNumber: null`
+ * episodes collected under the 'Specials' label. Entries without a tconst
+ * or a primaryTitle are dropped (nothing to link). Never throws: no
+ * episodes → no groups.
+ *
+ * @param {Array|null|undefined} episodes  Title children from useTitleEpisodes
+ * @returns {Array<{key: string, label: string, episodes: Array}>}
+ */
+export function groupEpisodesBySeason(episodes) {
+  if (!Array.isArray(episodes)) return [];
+  const groups = new Map(); // insertion order = API first-appearance order
+  for (const ep of episodes) {
+    if (!ep?.tconst || !ep?.primaryTitle) continue;
+    const season = ep.episode?.seasonNumber ?? null;
+    const key = season == null ? 'specials' : `season-${season}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, label: season == null ? 'Specials' : `Season ${season}`, episodes: [] });
+    }
+    groups.get(key).episodes.push(ep);
+  }
+  return [...groups.values()];
+}
+
+/**
  * DES-4 group order: directors, writers, cast, then remaining categories in
  * API order. The data's cast categories are 'actor'/'actress' (verified
  * live) — they fill the "cast" slot in their API order. This is an ORDERING

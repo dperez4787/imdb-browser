@@ -19,8 +19,10 @@ import { useParams } from 'react-router';
 
 import { useTitleDetail } from '../graphql/titleHooks.js';
 import CreditGroup from './CreditGroup.jsx';
+import EpisodesSection from './EpisodesSection.jsx';
 import { formatYears, groupCredits } from './format.js';
 import { ErrorState, NotFoundState } from './PageStates.jsx';
+import TitleBreadcrumb from './TitleBreadcrumb.jsx';
 import TitleHeader from './TitleHeader.jsx';
 
 /**
@@ -79,6 +81,8 @@ export default function TitlePage() {
 
   return (
     <article className="title-page">
+      {/* IMDB-20 hierarchy, upward: series › S1 E7 · episode (episodes only). */}
+      <TitleBreadcrumb title={title} />
       <TitleHeader title={title} deniedFields={deniedFields} />
       {groups.length > 0 && (
         <div className="title-credits">
@@ -87,6 +91,9 @@ export default function TitlePage() {
           ))}
         </div>
       )}
+      {/* IMDB-20 hierarchy, downward: its own lazy query — zero DOM when the
+          title has no children, so movie pages are untouched. */}
+      <EpisodesSection tconst={title.tconst} />
     </article>
   );
 }

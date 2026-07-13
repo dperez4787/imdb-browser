@@ -3,6 +3,9 @@
  * poster (PosterImage → FallbackArt on missing/404, lazy-loaded), the title,
  * a muted `year · ★rating` line, and up to three genre names. The whole card
  * is ONE link to the title detail route (`Tab` walks cards, `Enter` opens).
+ * Series-like cards additionally wear IMDB-20's "…" episodes affordance
+ * (EpisodesPopover) as a SIBLING of that link, so the main click-through
+ * stays whole.
  *
  * No vote count: DES-3's card shows the star rating only (`averageRating`,
  * ungoverned). `numVotes` is governed/denied and never rendered here, so this
@@ -12,6 +15,20 @@
 import { Link } from 'react-router';
 
 import PosterImage from '../PosterImage.jsx';
+import EpisodesPopover from './EpisodesPopover.jsx';
+
+/**
+ * IMDB-20: which cards wear the episodes "…" affordance. This is a UI
+ * HEURISTIC over two well-known IMDb type values, not a data vocabulary —
+ * the repo's no-hard-coding rule guards facet vocabularies (genres, title
+ * types as filter options come from `facets`), whereas this merely decides
+ * where a peek affordance is worth the pixels. A type outside the pair
+ * (e.g. tvEpisode, movie) simply gets no "…"; its detail page still shows
+ * children if the data has them, so the heuristic can never hide data.
+ */
+export function isSeriesLike(titleType) {
+  return titleType === 'tvSeries' || titleType === 'tvMiniSeries';
+}
 
 /** "1972 · ★ 9.2" — parts drop out silently when unknown. */
 export function titleCardMeta(item) {
@@ -39,6 +56,12 @@ export default function TitleCard({ item }) {
           {genres.length > 0 && <span className="title-card__genres">{genres.join(' · ')}</span>}
         </span>
       </Link>
+      {/* IMDB-20: series-like cards peek at their episodes without leaving
+          the grid. Sibling of the Link, so the card's main click-through is
+          untouched. */}
+      {isSeriesLike(item.titleType) && (
+        <EpisodesPopover tconst={item.tconst} titleName={item.primaryTitle} />
+      )}
     </li>
   );
 }
