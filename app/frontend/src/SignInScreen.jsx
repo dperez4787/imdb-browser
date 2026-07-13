@@ -114,14 +114,27 @@ export default function SignInScreen() {
         <p className="signin__caption">
           Google sign-in or one-click guest access. No account is created here.
         </p>
-        <a
-          className="signin__story"
-          href="https://project-d60a83c1-2c60-4d51-ad0.web.app/blog/imdb-federation/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Built end-to-end by an agent team — read the making-of&nbsp;↗
-        </a>
+        <span className="signin__links">
+          <a
+            className="signin__story"
+            href="/demo/federating-imdb-and-ai-agents.mp4"
+            target="_blank"
+            rel="noreferrer"
+          >
+            ▶&nbsp;See the demo
+          </a>
+          <span className="signin__links-sep" aria-hidden="true">
+            ·
+          </span>
+          <a
+            className="signin__story"
+            href="https://project-d60a83c1-2c60-4d51-ad0.web.app/blog/imdb-federation/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Read the making-of&nbsp;↗
+          </a>
+        </span>
       </section>
       <div className="signin__dots" aria-hidden="true" />
     </main>
